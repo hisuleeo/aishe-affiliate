@@ -38,8 +38,8 @@ export function SupportTicketForm() {
         getPreferredLanguage(),
         {
           id: user?.id,
-          name: user?.name,
-          email: user?.email,
+          name: user?.name ?? undefined,
+          email: user?.email ?? undefined,
           role: user?.role
         }
       );
