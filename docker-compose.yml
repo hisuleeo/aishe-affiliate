@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: aishe-postgres
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: pass
+      POSTGRES_DB: aishe
+    ports:
+      - '5433:5432'
+    volumes:
+      - aishe_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  aishe_postgres_data:

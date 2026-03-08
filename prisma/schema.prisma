@@ -1,0 +1,530 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE  @map("active")
+  BLOCKED @map("blocked")
+}
+
+enum UserRoleType {
+  ADMIN     @map("admin")
+  AFFILIATE @map("affiliate")
+  USER      @map("user")
+}
+
+enum WinnerType {
+  AFFILIATE @map("affiliate")
+  REFERRAL  @map("referral")
+}
+
+enum CommissionType {
+  FIXED       @map("fixed")
+  PERCENTAGE  @map("percentage")
+  TIERED      @map("tiered")
+}
+
+enum CommissionStatus {
+  PENDING  @map("pending")
+  APPROVED @map("approved")
+  PAID     @map("paid")
+}
+
+enum PayoutStatus {
+  PENDING     @map("pending")
+  PROCESSING  @map("processing")
+  PAID        @map("paid")
+  FAILED      @map("failed")
+}
+
+enum LedgerEntryType {
+  CREDIT @map("credit")
+  DEBIT  @map("debit")
+}
+
+enum ReferralRewardStatus {
+  PENDING  @map("pending")
+  APPROVED @map("approved")
+  CREDITED @map("credited")
+}
+
+enum OrderStatus {
+  PENDING  @map("pending")
+  PAID     @map("paid")
+  FAILED   @map("failed")
+  CANCELED @map("canceled")
+}
+
+enum ExtensionRequestStatus {
+  PENDING  @map("pending")
+  PAID     @map("paid")
+  FAILED   @map("failed")
+  CANCELED @map("canceled")
+}
+
+enum OrderAttributionType {
+  NONE      @map("none")
+  AFFILIATE @map("affiliate")
+  REFERRAL  @map("referral")
+}
+
+enum SupportTicketStatus {
+  OPEN        @map("open")
+  IN_PROGRESS @map("in_progress")
+  WAITING     @map("waiting")
+  RESOLVED    @map("resolved")
+  CLOSED      @map("closed")
+}
+
+enum SupportPriority {
+  LOW    @map("low")
+  MEDIUM @map("medium")
+  HIGH   @map("high")
+  URGENT @map("urgent")
+}
+
+model CommissionRule {
+  id                String   @id @default(uuid()) @db.Uuid
+  ruleName          String   @map("rule_name")
+  minSalesThreshold Int      @map("min_sales_threshold")
+  commissionRate    Decimal  @db.Decimal(6, 4) @map("commission_rate")
+  priority          Int      @default(0)
+  isActive          Boolean  @default(true) @map("is_active")
+  packageId         String?  @db.Uuid @map("package_id")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  package Package? @relation(fields: [packageId], references: [id], onDelete: SetNull)
+
+  @@index([isActive, minSalesThreshold], map: "idx_commission_rules_active_threshold")
+  @@index([packageId, priority], map: "idx_commission_rules_package_priority")
+  @@map("commission_rules")
+}
+
+model User {
+  id        String      @id @default(uuid()) @db.Uuid
+  email     String      @unique
+  username  String?     @unique
+  passwordHash String   @map("password_hash")
+  name      String?
+  status    UserStatus  @default(ACTIVE)
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  roles                UserRole[]
+  affiliateProfile     AffiliateProfile?
+  affiliateLinks       AffiliateLink[]
+  conversionsAffiliate Conversion[]  @relation("AffiliateConversions")
+  conversionsReferral  Conversion[]  @relation("ReferralConversions")
+  commissions          Commission[]
+  affiliatePayouts     AffiliatePayout[]
+  affiliateLedger      AffiliateLedger[]
+  referralCodes        ReferralCode[]
+  referralSignups      ReferralSignup[] @relation("ReferralSignups")
+  referralRewards      ReferralReward[]
+  referralCredits      ReferralCredit[]
+  auditLogs            AuditLog[]
+  orders               Order[]         @relation("BuyerOrders")
+  referralOrders       Order[]         @relation("ReferralOrders")
+  extensionRequests    ExtensionRequest[] @relation("UserExtensionRequests")
+  supportTickets       SupportTicket[]
+  supportTicketReplies SupportTicketReply[]
+
+  @@map("users")
+}
+
+model UserRole {
+  userId String       @db.Uuid @map("user_id")
+  role   UserRoleType @map("role")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, role])
+  @@map("user_roles")
+}
+
+model Program {
+  id                    String   @id @default(uuid()) @db.Uuid
+  name                  String
+  status                String   @default("active")
+  attributionWindowDays Int      @default(30) @map("attribution_window_days")
+  cookieTtlDays         Int      @default(30) @map("cookie_ttl_days")
+  defaultCurrency       String   @db.Char(3) @map("default_currency")
+  createdAt             DateTime @default(now()) @map("created_at")
+
+  campaigns       Campaign[]
+  affiliateLinks  AffiliateLink[]
+  conversions     Conversion[]
+  commissionTiers CommissionTier[]
+
+  @@map("programs")
+}
+
+model Campaign {
+  id        String   @id @default(uuid()) @db.Uuid
+  programId String   @db.Uuid @map("program_id")
+  name      String
+  status    String   @default("active")
+  startsAt  DateTime? @map("starts_at")
+  endsAt    DateTime? @map("ends_at")
+
+  program Program @relation(fields: [programId], references: [id], onDelete: Cascade)
+  affiliateLinks AffiliateLink[]
+
+  @@map("campaigns")
+}
+
+model AffiliateProfile {
+  userId        String   @id @db.Uuid @map("user_id")
+  status        String   @default("pending")
+  approvedAt    DateTime? @map("approved_at")
+  payoutMethod  String?  @map("payout_method")
+  payoutDetails Json?    @map("payout_details")
+  taxInfo       Json?    @map("tax_info")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("affiliate_profiles")
+}
+
+model AffiliateLink {
+  id          String   @id @default(uuid()) @db.Uuid
+  affiliateId String   @db.Uuid @map("affiliate_id")
+  programId   String   @db.Uuid @map("program_id")
+  campaignId  String?  @db.Uuid @map("campaign_id")
+  code        String   @unique
+  targetUrl   String   @map("target_url")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  affiliate User     @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  program   Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  campaign  Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  clicks    Click[]
+
+  @@map("affiliate_links")
+}
+
+model Click {
+  id              String   @id @default(uuid()) @db.Uuid
+  affiliateLinkId String   @db.Uuid @map("affiliate_link_id")
+  cookieId        String   @map("cookie_id")
+  ipHash          String?  @map("ip_hash")
+  userAgent       String?  @map("user_agent")
+  utmSource       String?  @map("utm_source")
+  utmMedium       String?  @map("utm_medium")
+  utmCampaign     String?  @map("utm_campaign")
+  clickedAt       DateTime @default(now()) @map("clicked_at")
+
+  affiliateLink AffiliateLink @relation(fields: [affiliateLinkId], references: [id], onDelete: Cascade)
+
+  @@index([cookieId, clickedAt], map: "idx_clicks_cookie_clicked_at")
+  @@index([affiliateLinkId], map: "idx_clicks_affiliate_link")
+  @@map("clicks")
+}
+
+model Conversion {
+  id              String     @id @default(uuid()) @db.Uuid
+  programId       String     @db.Uuid @map("program_id")
+  externalOrderId String     @unique @map("external_order_id")
+  amount          Decimal    @db.Decimal(18, 4)
+  currency        String     @db.Char(3)
+  conversionAt    DateTime   @default(now()) @map("conversion_at")
+  affiliateId     String?    @db.Uuid @map("affiliate_id")
+  referralId      String?    @db.Uuid @map("referral_id")
+  winnerType      WinnerType @map("winner_type")
+  winnerId        String     @db.Uuid @map("winner_id")
+
+  program   Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  affiliate User?    @relation("AffiliateConversions", fields: [affiliateId], references: [id])
+  referral  User?    @relation("ReferralConversions", fields: [referralId], references: [id])
+  commission Commission?
+
+  @@index([conversionAt], map: "idx_conversions_conversion_at")
+  @@map("conversions")
+}
+
+model Package {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String
+  description String?
+  price       Decimal  @db.Decimal(18, 4)
+  currency    String   @db.Char(3)
+  commissionRate Decimal @db.Decimal(6, 4) @map("commission_rate")
+  isCustom    Boolean  @default(false) @map("is_custom")
+  customOptions Json?  @map("custom_options")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  orders Order[]
+  commissionRules CommissionRule[]
+
+  @@map("packages")
+}
+
+model Order {
+  id               String              @id @default(uuid()) @db.Uuid
+  buyerId          String              @db.Uuid @map("buyer_id")
+  packageId        String              @db.Uuid @map("package_id")
+  status           OrderStatus         @default(PENDING)
+  amount           Decimal             @db.Decimal(18, 4)
+  currency         String              @db.Char(3)
+  attributionType  OrderAttributionType @default(NONE) @map("attribution_type")
+  affiliateId      String?             @db.Uuid @map("affiliate_id")
+  referralCode     String?             @map("referral_code")
+  referralUserId   String?             @db.Uuid @map("referral_user_id")
+  aisheId          String?             @map("aishe_id")
+  selectedOptions  Json?               @map("selected_options")
+  needsInvoice     Boolean?            @default(false) @map("needs_invoice")
+  invoiceInfo      Json?               @map("invoice_info")
+  validUntil       DateTime?           @map("valid_until")
+  createdAt        DateTime            @default(now()) @map("created_at")
+
+  buyer             User                @relation("BuyerOrders", fields: [buyerId], references: [id], onDelete: Cascade)
+  referralUser      User?               @relation("ReferralOrders", fields: [referralUserId], references: [id], onDelete: SetNull)
+  package           Package             @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  extensionRequests ExtensionRequest[]
+
+  @@index([buyerId, createdAt], map: "idx_orders_buyer_created")
+  @@index([status], map: "idx_orders_status")
+  @@index([aisheId], map: "idx_orders_aishe_id")
+  @@map("orders")
+}
+
+model ExtensionRequest {
+  id        String                 @id @default(uuid()) @db.Uuid
+  orderId   String                 @db.Uuid @map("order_id")
+  userId    String                 @db.Uuid @map("user_id")
+  status    ExtensionRequestStatus @default(PENDING)
+  amount    Decimal                @db.Decimal(18, 4)
+  currency  String                 @db.Char(3)
+  months    Int                    @default(1)
+  createdAt DateTime               @default(now()) @map("created_at")
+  paidAt    DateTime?              @map("paid_at")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user  User  @relation("UserExtensionRequests", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt], map: "idx_extension_requests_user_created")
+  @@index([orderId], map: "idx_extension_requests_order")
+  @@map("extension_requests")
+}
+
+model CommissionTier {
+  id                String   @id @default(uuid()) @db.Uuid
+  programId         String   @db.Uuid @map("program_id")
+  tierName          String   @map("tier_name")
+  minSalesThreshold Decimal  @default(0) @db.Decimal(18, 4) @map("min_sales_threshold")
+  commissionRate    Decimal  @db.Decimal(6, 4) @map("commission_rate")
+  currency          String   @db.Char(3)
+
+  program     Program    @relation(fields: [programId], references: [id], onDelete: Cascade)
+  commissions Commission[]
+
+  @@map("commission_tiers")
+}
+
+model Commission {
+  id            String           @id @default(uuid()) @db.Uuid
+  conversionId  String           @unique @db.Uuid @map("conversion_id")
+  affiliateId   String           @db.Uuid @map("affiliate_id")
+  tierId        String?          @db.Uuid @map("tier_id")
+  type          CommissionType   @map("type")
+  amount        Decimal          @db.Decimal(18, 4)
+  currency      String           @db.Char(3)
+  status        CommissionStatus @default(PENDING)
+
+  conversion Conversion      @relation(fields: [conversionId], references: [id], onDelete: Cascade)
+  affiliate  User            @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  tier       CommissionTier? @relation(fields: [tierId], references: [id], onDelete: SetNull)
+  payoutItems AffiliatePayoutItem[]
+
+  @@index([affiliateId, status], map: "idx_commissions_affiliate_status")
+  @@map("commissions")
+}
+
+model AffiliatePayout {
+  id         String       @id @default(uuid()) @db.Uuid
+  affiliateId String      @db.Uuid @map("affiliate_id")
+  status     PayoutStatus @default(PENDING)
+  totalAmount Decimal     @db.Decimal(18, 4) @map("total_amount")
+  currency   String       @db.Char(3)
+  periodStart DateTime    @map("period_start")
+  periodEnd   DateTime    @map("period_end")
+  paidAt     DateTime?    @map("paid_at")
+
+  affiliate User @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  payoutItems AffiliatePayoutItem[]
+
+  @@map("affiliate_payouts")
+}
+
+model AffiliatePayoutItem {
+  payoutId     String @db.Uuid @map("payout_id")
+  commissionId String @db.Uuid @map("commission_id")
+
+  payout     AffiliatePayout @relation(fields: [payoutId], references: [id], onDelete: Cascade)
+  commission Commission      @relation(fields: [commissionId], references: [id], onDelete: Cascade)
+
+  @@id([payoutId, commissionId])
+  @@map("affiliate_payout_items")
+}
+
+model AffiliateLedger {
+  id          String          @id @default(uuid()) @db.Uuid
+  affiliateId String          @db.Uuid @map("affiliate_id")
+  type        LedgerEntryType @map("type")
+  amount      Decimal         @db.Decimal(18, 4)
+  currency    String          @db.Char(3)
+  refType     String          @map("ref_type")
+  refId       String?         @db.Uuid @map("ref_id")
+  createdAt   DateTime        @default(now()) @map("created_at")
+
+  affiliate User @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+
+  @@index([affiliateId, createdAt], map: "idx_affiliate_ledger_affiliate_created")
+  @@map("affiliate_ledger")
+}
+
+model ReferralCode {
+  id     String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid @map("user_id")
+  code   String @unique
+
+  user    User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invites ReferralInvite[]
+
+  @@map("referral_codes")
+}
+
+model ReferralInvite {
+  id      String   @id @default(uuid()) @db.Uuid
+  codeId  String   @db.Uuid @map("code_id")
+  target  String
+  channel String
+  sentAt  DateTime @default(now()) @map("sent_at")
+
+  code    ReferralCode   @relation(fields: [codeId], references: [id], onDelete: Cascade)
+  signups ReferralSignup[]
+
+  @@map("referral_invites")
+}
+
+model ReferralSignup {
+  id         String   @id @default(uuid()) @db.Uuid
+  inviteId   String   @db.Uuid @map("invite_id")
+  newUserId  String   @db.Uuid @map("new_user_id")
+  signedUpAt DateTime @default(now()) @map("signed_up_at")
+
+  invite   ReferralInvite @relation(fields: [inviteId], references: [id], onDelete: Cascade)
+  newUser  User           @relation("ReferralSignups", fields: [newUserId], references: [id], onDelete: Cascade)
+  rewards  ReferralReward[]
+
+  @@map("referral_signups")
+}
+
+model ReferralReward {
+  id             String               @id @default(uuid()) @db.Uuid
+  referralUserId String               @db.Uuid @map("referral_user_id")
+  signupId       String               @db.Uuid @map("signup_id")
+  amount         Decimal              @db.Decimal(18, 4)
+  currency       String               @db.Char(3)
+  status         ReferralRewardStatus @default(PENDING)
+
+  referralUser User           @relation(fields: [referralUserId], references: [id], onDelete: Cascade)
+  signup       ReferralSignup @relation(fields: [signupId], references: [id], onDelete: Cascade)
+
+  @@map("referral_rewards")
+}
+
+model ReferralCredit {
+  id             String          @id @default(uuid()) @db.Uuid
+  referralUserId String          @db.Uuid @map("referral_user_id")
+  type           LedgerEntryType @map("type")
+  amount         Decimal         @db.Decimal(18, 4)
+  currency       String          @db.Char(3)
+  refType        String          @map("ref_type")
+  refId          String?         @db.Uuid @map("ref_id")
+  createdAt      DateTime        @default(now()) @map("created_at")
+
+  referralUser User @relation(fields: [referralUserId], references: [id], onDelete: Cascade)
+
+  @@index([referralUserId, createdAt], map: "idx_referral_credits_user_created")
+  @@map("referral_credits")
+}
+
+model WebhookEvent {
+  id          String   @id @default(uuid()) @db.Uuid
+  eventType   String   @map("event_type")
+  externalId  String   @map("external_id")
+  payload     Json
+  receivedAt  DateTime @default(now()) @map("received_at")
+  processedAt DateTime? @map("processed_at")
+
+  @@unique([eventType, externalId])
+  @@map("webhook_events")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  actorId   String?  @db.Uuid @map("actor_id")
+  action    String
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@map("audit_logs")
+}
+
+model SupportTicket {
+  id          String              @id @default(uuid()) @db.Uuid
+  userId      String              @db.Uuid @map("user_id")
+  subject     String
+  description String              @db.Text
+  category    String              @default("GENERAL")
+  priority    SupportPriority     @default(MEDIUM)
+  status      SupportTicketStatus @default(OPEN)
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @updatedAt @map("updated_at")
+  closedAt    DateTime?           @map("closed_at")
+
+  user    User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  replies SupportTicketReply[]
+
+  @@index([userId], map: "idx_support_tickets_user")
+  @@index([status], map: "idx_support_tickets_status")
+  @@index([createdAt], map: "idx_support_tickets_created")
+  @@map("support_tickets")
+}
+
+model SupportTicketReply {
+  id        String   @id @default(uuid()) @db.Uuid
+  ticketId  String   @db.Uuid @map("ticket_id")
+  userId    String   @db.Uuid @map("user_id")
+  message   String   @db.Text
+  isStaff   Boolean  @default(false) @map("is_staff")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  user   User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId], map: "idx_support_replies_ticket")
+  @@map("support_ticket_replies")
+}
+
+model SystemSetting {
+  id        String   @id @default(uuid()) @db.Uuid
+  key       String   @unique
+  value     String
+  type      String   @default("string") // string, boolean, number, json
+  category  String   @default("general") // general, maintenance, notification
+  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("system_settings")
+}

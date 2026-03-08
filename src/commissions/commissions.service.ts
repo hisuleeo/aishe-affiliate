@@ -1,0 +1,103 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { LedgerEntryType, Prisma } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
+
+// Komisyon hesaplama servisi (Rule bazlı yapı)
+@Injectable()
+export class CommissionsService {
+  private readonly logger = new Logger(CommissionsService.name);
+  private readonly defaultCommissionRate = new Prisma.Decimal(0.1);
+
+  constructor(private readonly prisma: PrismaService) {}
+
+  // OrderPaidEvent sonrası komisyon hesaplaması için temel iskelet
+  async calculateCommission(orderId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { package: true },
+    });
+
+    if (!order) {
+      this.logger.warn(`Order bulunamadı: ${orderId}`);
+      return;
+    }
+
+    if (!order.affiliateId) {
+      this.logger.log(`Affiliate yok, komisyon yazılmadı: order=${order.id}`);
+      return;
+    }
+
+    const rule = await this.findApplicableRule(order.packageId);
+    const commissionRate = rule?.commissionRate ?? this.defaultCommissionRate;
+    const commissionAmount = order.amount.mul(commissionRate);
+
+    await this.writeLedgerEntry({
+      affiliateId: order.affiliateId,
+      amount: commissionAmount,
+      currency: order.currency,
+      refId: order.id,
+    });
+
+    this.logger.log(
+      `Komisyon ledger kaydı oluşturuldu: order=${order.id}, rate=${commissionRate.toString()}, amount=${commissionAmount.toString()}`,
+    );
+  }
+
+  private async findApplicableRule(packageId: string) {
+    // 1) Paket bazlı özel kural (varsa)
+    const specificRule = await this.prisma.commissionRule.findFirst({
+      where: {
+        isActive: true,
+        packageId,
+      },
+      orderBy: [{ priority: 'desc' }, { minSalesThreshold: 'desc' }],
+    });
+
+    if (specificRule) {
+      return specificRule;
+    }
+
+    // 2) Genel kurallar (packageId null) içinde en yüksek eşik + öncelik
+    return this.prisma.commissionRule.findFirst({
+      where: {
+        isActive: true,
+        packageId: null,
+      },
+      orderBy: [{ minSalesThreshold: 'desc' }, { priority: 'desc' }],
+    });
+  }
+
+  private writeLedgerEntry(input: {
+    affiliateId: string;
+    amount: Prisma.Decimal;
+    currency: string;
+    refId: string;
+  }) {
+    // Idempotency: aynı order için ledger kaydı varsa tekrar yazma
+    return this.prisma.affiliateLedger.findFirst({
+      where: {
+        refType: 'order',
+        refId: input.refId,
+        affiliateId: input.affiliateId,
+      },
+    }).then((existing) => {
+      if (existing) {
+        this.logger.warn(
+          `Ledger kaydı zaten var: order=${input.refId}, affiliate=${input.affiliateId}`,
+        );
+        return existing;
+      }
+
+      return this.prisma.affiliateLedger.create({
+      data: {
+        affiliateId: input.affiliateId,
+        type: LedgerEntryType.CREDIT,
+        amount: input.amount,
+        currency: input.currency,
+        refType: 'order',
+        refId: input.refId,
+      },
+      });
+    });
+  }
+}
