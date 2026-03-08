@@ -95,8 +95,8 @@ export default function AdminDashboard() {
 
   const ordersSummary = useMemo(() => {
     const items = orders ?? [];
-    const affiliateOrders = items.filter((order) => order.attributionType === 'AFFILIATE');
-    const referralOrders = items.filter((order) => order.attributionType === 'REFERRAL');
+    const affiliateOrders = items.filter((order) => order.attributionType === 'affiliate');
+    const referralOrders = items.filter((order) => order.attributionType === 'referral');
     const totalRevenue = items.reduce((sum, order) => sum + Number(order.amount), 0);
     const affiliateRevenue = affiliateOrders.reduce((sum, order) => sum + Number(order.amount), 0);
     const referralRevenue = referralOrders.reduce((sum, order) => sum + Number(order.amount), 0);
