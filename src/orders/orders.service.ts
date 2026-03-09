@@ -37,11 +37,19 @@ export class OrdersService {
     const validUntil = new Date();
     validUntil.setMonth(validUntil.getMonth() + 1);
 
+    // Custom paketlerde fiyat hesaplama: base(25) + seçili özellik sayısı × 10
+    let calculatedAmount = Number(pkg.price);
+    if (pkg.isCustom && payload.selectedOptions && payload.selectedOptions.length > 0) {
+      const BASE_PRICE = 25;
+      const FEATURE_PRICE = 10;
+      calculatedAmount = BASE_PRICE + (payload.selectedOptions.length * FEATURE_PRICE);
+    }
+
   const order = await this.ordersRepository.create({
       buyer: { connect: { id: buyerId } },
       package: { connect: { id: pkg.id } },
       status: OrderStatus.PENDING,
-      amount: pkg.price,
+      amount: calculatedAmount,
       currency: pkg.currency,
       attributionType: attribution.type,
       affiliateId: attribution.affiliateId,
