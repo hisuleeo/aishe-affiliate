@@ -17,22 +17,23 @@ type CustomFeature = {
 };
 
 const customFeatureOptions: CustomFeature[] = [
+  { id: 'lot', label: 'Lot' },
   { id: 'nps', label: 'NPS' },
   { id: 'npse', label: 'NPSE' },
   { id: 'recording', label: 'Recording' },
-  { id: 'recAnalyse', label: 'Rec.Analyse' },
-  { id: 'stateAnalyse', label: 'State Analyse' },
+  { id: 'reca', label: 'RecA' },
+  { id: 'statea', label: 'StateA' },
   { id: 'aisp', label: 'AISP' },
-  { id: 'badList', label: 'Bad List' },
-  { id: 'weeklyEvents', label: 'Weekly Events' },
-  { id: 'waveInt', label: 'Wave int.' },
+  { id: 'badl', label: 'BadL' },
+  { id: 'wevents', label: 'W-Events' },
+  { id: 'wave', label: 'Wave' },
 ];
 
 const FEATURE_PRICE = 10; // Her checkbox +10€
 const BASE_PRICE = 25;    // Base fiyat 25€
 const LIMIT_PER_UNIT = 50; // Her 1.0 GB = 50€
 
-const defaultSelected = ['recAnalyse', 'stateAnalyse', 'aisp', 'weeklyEvents'];
+const defaultSelected = ['reca', 'statea', 'aisp', 'wevents'];
 
 export default function PricingSection() {
   const router = useRouter();
