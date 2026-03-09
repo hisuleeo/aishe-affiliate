@@ -281,10 +281,8 @@ export default function ChatWidget() {
         <div className="w-[320px] max-sm:w-[calc(100vw-2rem)] overflow-hidden rounded-3xl border border-slate-800 bg-slate-950/95 shadow-[0_20px_60px_rgba(15,23,42,0.65)] backdrop-blur animate-in slide-in-from-bottom-4 fade-in duration-300">
           <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3 max-sm:px-3 max-sm:py-2">
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-2xl border border-indigo-500/50 bg-indigo-500/10 text-indigo-200 max-sm:h-8 max-sm:w-8">
-                <svg viewBox="0 0 24 24" className="h-5 w-5 max-sm:h-4 max-sm:w-4" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9M7.5 12h4.5m-6.75 7.5V6a2.25 2.25 0 0 1 2.25-2.25h9A2.25 2.25 0 0 1 19.5 6v8.25a2.25 2.25 0 0 1-2.25 2.25H9l-3.75 3Z" />
-                </svg>
+              <div className="flex h-9 w-9 items-center justify-center rounded-2xl border border-indigo-500/50 bg-indigo-500/10 max-sm:h-8 max-sm:w-8 overflow-hidden">
+                <img src="/brand/favicon.png" alt="AISHE" className="h-7 w-7 rounded-full object-contain max-sm:h-6 max-sm:w-6" />
               </div>
               <div>
                 <p className="text-sm font-semibold text-white max-sm:text-xs">AISHE Chatbot</p>
