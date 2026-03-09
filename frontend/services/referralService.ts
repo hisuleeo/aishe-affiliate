@@ -20,3 +20,13 @@ export const getAffiliateLinkMetrics = async (linkId: string) => {
   const response = await apiClient.get<UserAffiliateLinkMetrics>(`/users/me/affiliate-links/${linkId}/metrics`);
   return response.data;
 };
+
+export const getReferralStats = async () => {
+  const response = await apiClient.get<{
+    totalInvites: number;
+    successfulInvites: number;
+    totalRewards: string;
+    currency: string;
+  }>('/users/me/referral-stats');
+  return response.data;
+};

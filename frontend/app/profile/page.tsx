@@ -15,6 +15,7 @@ import { getOrders } from '@/services/orderService';
 import { getPackages } from '@/services/packageService';
 import { getProfile, updateProfile } from '@/services/profileService';
 import { getExtensionRequests, createExtensionRequest } from '@/services/extensionService';
+import { getReferralStats } from '@/services/referralService';
 import { 
   User, 
   Package, 
@@ -126,6 +127,12 @@ export default function ProfilePage() {
     queryKey: ['extension-requests'],
     queryFn: getExtensionRequests,
     enabled: isAuthenticated,
+  });
+
+  const { data: referralStats } = useQuery({
+    queryKey: ['referral-stats'],
+    queryFn: getReferralStats,
+    enabled: isAuthenticated && isMounted,
   });
 
   const packageOptions = useMemo(() => packages ?? [], [packages]);
@@ -881,7 +888,7 @@ export default function ProfilePage() {
                       <p className="text-xs font-medium text-slate-400">Toplam Davet</p>
                       <Users className="h-4 w-4 text-indigo-400" />
                     </div>
-                    <p className="text-2xl font-bold text-white">0</p>
+                    <p className="text-2xl font-bold text-white">{referralStats?.totalInvites ?? 0}</p>
                     <p className="text-xs text-slate-500 mt-1">Davet ettiğiniz kişi sayısı</p>
                   </div>
 
@@ -890,7 +897,7 @@ export default function ProfilePage() {
                       <p className="text-xs font-medium text-slate-400">Başarılı Davet</p>
                       <CheckCircle2 className="h-4 w-4 text-green-400" />
                     </div>
-                    <p className="text-2xl font-bold text-white">0</p>
+                    <p className="text-2xl font-bold text-white">{referralStats?.successfulInvites ?? 0}</p>
                     <p className="text-xs text-slate-500 mt-1">Satın alan kişi sayısı</p>
                   </div>
 
@@ -899,7 +906,7 @@ export default function ProfilePage() {
                       <p className="text-xs font-medium text-slate-400">Toplam Ödül</p>
                       <Gift className="h-4 w-4 text-yellow-400" />
                     </div>
-                    <p className="text-2xl font-bold text-white">€0.00</p>
+                    <p className="text-2xl font-bold text-white">€{referralStats?.totalRewards ?? '0.00'}</p>
                     <p className="text-xs text-slate-500 mt-1">Kazandığınız toplam ödül</p>
                   </div>
                 </div>

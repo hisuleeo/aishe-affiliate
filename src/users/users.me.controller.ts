@@ -15,6 +15,11 @@ export class UsersMeController {
     return this.usersService.getOrCreateReferralCode(request.user.userId);
   }
 
+  @Get('referral-stats')
+  getReferralStats(@Req() request: { user: { userId: string } }) {
+    return this.usersService.getReferralStats(request.user.userId);
+  }
+
   @Get('profile')
   getProfile(@Req() request: { user: { userId: string } }) {
     return this.usersService.getProfile(request.user.userId);

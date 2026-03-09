@@ -143,6 +143,52 @@ export class UsersService {
     });
   }
 
+  async getReferralStats(userId: string) {
+    // Kullanıcının referral code'unu bul
+    const referralCode = await this.prisma.referralCode.findFirst({
+      where: { userId },
+    });
+
+    if (!referralCode) {
+      return {
+        totalInvites: 0,
+        successfulInvites: 0,
+        totalRewards: '0.00',
+        currency: 'EUR',
+      };
+    }
+
+    // Bu code ile oluşturulan inviteleri bul
+    const invites = await this.prisma.referralInvite.findMany({
+      where: { codeId: referralCode.id },
+      include: {
+        signups: true,
+      },
+    });
+
+    const totalInvites = invites.reduce((sum, inv) => sum + inv.signups.length, 0);
+
+    // Başarılı davetler (signup yapmış kişiler)
+    const successfulInvites = totalInvites;
+
+    // Toplam ödüller (ReferralReward tablosundan)
+    const rewards = await this.prisma.referralReward.findMany({
+      where: { referralUserId: userId },
+    });
+
+    const totalRewards = rewards.reduce(
+      (sum, reward) => sum + Number(reward.amount),
+      0,
+    );
+
+    return {
+      totalInvites,
+      successfulInvites,
+      totalRewards: totalRewards.toFixed(2),
+      currency: rewards[0]?.currency ?? 'EUR',
+    };
+  }
+
   listAffiliateLinks(userId: string) {
     return this.prisma.affiliateLink.findMany({
       where: { affiliateId: userId },
