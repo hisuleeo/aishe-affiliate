@@ -22,8 +22,12 @@ async function bootstrap() {
       'http://127.0.0.1:3000',
       'http://localhost:3001',
       'http://127.0.0.1:3001',
+      'https://home.aishe.pro',
+      'https://app.aishe.pro',
     ],
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Authorization', 'Content-Type'],
   });
 
   app.useGlobalPipes(
