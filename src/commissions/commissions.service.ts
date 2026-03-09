@@ -73,19 +73,7 @@ export class CommissionsService {
     const rewardRate = new Prisma.Decimal(0.05);
     const rewardAmount = order.amount.mul(rewardRate);
 
-    // Aynı order için zaten reward varsa tekrar oluşturma
-    const existingReward = await this.prisma.referralReward.findFirst({
-      where: {
-        signupId: signup.id,
-        // Aynı order için kontrol etmek için custom field ekleyebiliriz ama şimdilik signup bazlı
-      },
-    });
-
-    if (existingReward) {
-      this.logger.warn(`Referral reward zaten var: signup=${signup.id}`);
-      return;
-    }
-
+    // Her sipariş için yeni reward oluştur (signup birden fazla sipariş verebilir)
     await this.prisma.referralReward.create({
       data: {
         referralUserId,
@@ -97,7 +85,7 @@ export class CommissionsService {
     });
 
     this.logger.log(
-      `Referral reward oluşturuldu: signup=${signup.id}, referrer=${referralUserId}, amount=${rewardAmount.toString()}`,
+      `Referral reward oluşturuldu: signup=${signup.id}, referrer=${referralUserId}, amount=${rewardAmount.toString()}, order=${order.id}`,
     );
   }
 
