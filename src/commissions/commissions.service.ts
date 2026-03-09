@@ -22,11 +22,16 @@ export class CommissionsService {
       return;
     }
 
-    if (!order.affiliateId) {
-      this.logger.log(`Affiliate yok, komisyon yazılmadı: order=${order.id}`);
-      return;
+    // 1. Affiliate komisyonu (eğer varsa)
+    if (order.affiliateId) {
+      await this.calculateAffiliateCommission(order);
     }
 
+    // 2. Referral ödülü (eğer kullanıcı referral ile kayıt olduysa)
+    await this.calculateReferralReward(order);
+  }
+
+  private async calculateAffiliateCommission(order: any) {
     const rule = await this.findApplicableRule(order.packageId);
     const commissionRate = rule?.commissionRate ?? this.defaultCommissionRate;
     const commissionAmount = order.amount.mul(commissionRate);
@@ -40,6 +45,59 @@ export class CommissionsService {
 
     this.logger.log(
       `Komisyon ledger kaydı oluşturuldu: order=${order.id}, rate=${commissionRate.toString()}, amount=${commissionAmount.toString()}`,
+    );
+  }
+
+  private async calculateReferralReward(order: any) {
+    // Kullanıcının referral signup kaydını bul
+    const signup = await this.prisma.referralSignup.findFirst({
+      where: { newUserId: order.userId },
+      include: {
+        invite: {
+          include: {
+            code: true,
+          },
+        },
+      },
+    });
+
+    if (!signup) {
+      this.logger.log(`Referral signup yok: user=${order.userId}`);
+      return;
+    }
+
+    // Referral user ID
+    const referralUserId = signup.invite.code.userId;
+
+    // Ödül oranı: %5 (varsayılan)
+    const rewardRate = new Prisma.Decimal(0.05);
+    const rewardAmount = order.amount.mul(rewardRate);
+
+    // Aynı order için zaten reward varsa tekrar oluşturma
+    const existingReward = await this.prisma.referralReward.findFirst({
+      where: {
+        signupId: signup.id,
+        // Aynı order için kontrol etmek için custom field ekleyebiliriz ama şimdilik signup bazlı
+      },
+    });
+
+    if (existingReward) {
+      this.logger.warn(`Referral reward zaten var: signup=${signup.id}`);
+      return;
+    }
+
+    await this.prisma.referralReward.create({
+      data: {
+        referralUserId,
+        signupId: signup.id,
+        amount: rewardAmount,
+        currency: order.currency,
+        status: 'PENDING',
+      },
+    });
+
+    this.logger.log(
+      `Referral reward oluşturuldu: signup=${signup.id}, referrer=${referralUserId}, amount=${rewardAmount.toString()}`,
     );
   }
 
