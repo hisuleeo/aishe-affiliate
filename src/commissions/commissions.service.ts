@@ -92,7 +92,7 @@ export class CommissionsService {
         signupId: signup.id,
         amount: rewardAmount,
         currency: order.currency,
-        status: 'PENDING',
+        status: 'pending',
       },
     });
 
