@@ -11,7 +11,7 @@ import { Roles } from '../decorators/roles.decorator';
 import { CurrentUser } from '../decorators/current-user.decorator';
 
 interface JwtPayload {
-  sub: string;
+  userId: string;
   email: string;
   roles: string[];
 }
@@ -31,14 +31,14 @@ export class SupportController {
   @UseGuards(JwtAuthGuard)
   @Post('tickets')
   createTicket(@CurrentUser() user: JwtPayload, @Body() dto: CreateTicketDto) {
-    return this.supportService.createTicket(user.sub, dto);
+    return this.supportService.createTicket(user.userId, dto);
   }
 
   // Get user's tickets
   @UseGuards(JwtAuthGuard)
   @Get('tickets/my')
   getUserTickets(@CurrentUser() user: JwtPayload) {
-    return this.supportService.getUserTickets(user.sub);
+    return this.supportService.getUserTickets(user.userId);
   }
 
   // Get specific ticket
@@ -46,7 +46,7 @@ export class SupportController {
   @Get('tickets/:id')
   getTicket(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     const isAdmin = user.roles.includes('ADMIN');
-    return this.supportService.getTicketById(id, isAdmin ? undefined : user.sub);
+    return this.supportService.getTicketById(id, isAdmin ? undefined : user.userId);
   }
 
   // Add reply to ticket
@@ -58,7 +58,7 @@ export class SupportController {
     @Body() dto: AddReplyDto,
   ) {
     const isStaff = user.roles.includes('ADMIN');
-    return this.supportService.addReply(id, user.sub, dto, isStaff);
+    return this.supportService.addReply(id, user.userId, dto, isStaff);
   }
 
   // Admin endpoints
