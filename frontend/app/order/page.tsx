@@ -36,6 +36,7 @@ function OrderContent() {
   const [customLimits, setCustomLimits] = useState<Record<string, number>>({});
   const [aisheId, setAisheId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [orderSuccess, setOrderSuccess] = useState(false);
   const [needsInvoice, setNeedsInvoice] = useState(false);
   const [invoiceInfo, setInvoiceInfo] = useState({
     companyName: '',
@@ -179,16 +180,7 @@ function OrderContent() {
         description: 'Siparişiniz başarıyla alındı.',
         variant: 'success',
       });
-      setSelectedPackageId('');
-      setCustomSelections((prev) => ({ ...prev, [selectedPackage.id]: [] }));
-      setAisheId('');
-      setNeedsInvoice(false);
-      setInvoiceInfo({
-        companyName: '',
-        taxNumber: '',
-        taxOffice: '',
-        address: '',
-      });
+      setOrderSuccess(true);
     } catch {
       showToast({
         title: 'Sipariş oluşturulamadı',
@@ -205,6 +197,75 @@ function OrderContent() {
       <main className="min-h-screen bg-slate-950 text-white">
         <div className="flex min-h-[60vh] items-center justify-center">
           <div className="text-slate-300">Yükleniyor...</div>
+        </div>
+      </main>
+    );
+  }
+
+  if (orderSuccess) {
+    return (
+      <main className="min-h-screen bg-slate-950 text-white">
+        <header className="sticky top-0 z-40 border-b border-slate-800/70 bg-slate-950/95 backdrop-blur">
+          <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-6 py-4">
+            <div className="flex items-center gap-3">
+              <Image
+                src="/brand/aishelogo.png"
+                alt="AISHE"
+                width={120}
+                height={40}
+                className="h-8 w-auto object-contain"
+                priority
+              />
+            </div>
+            <nav className="flex items-center gap-6 text-sm text-slate-300">
+              <Link href="/" className="transition hover:text-white">Ana sayfa</Link>
+              <Link href="/dashboard" className="transition hover:text-white">Panel</Link>
+            </nav>
+          </div>
+        </header>
+        <div className="mx-auto flex max-w-lg flex-col items-center justify-center px-6 py-24 text-center">
+          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/20 border border-emerald-500/40">
+            <svg className="h-10 w-10 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h1 className="mt-6 text-3xl font-bold text-white">Siparişiniz Alındı!</h1>
+          <p className="mt-3 text-sm text-slate-400">
+            Siparişiniz başarıyla oluşturuldu. AISHE uygulamasını indirip kurulumu tamamlayabilirsiniz.
+          </p>
+          <a
+            href="https://aishe.ai"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-8 inline-flex items-center gap-3 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 px-8 py-4 text-base font-bold text-white shadow-lg shadow-indigo-500/30 transition-all hover:scale-105 hover:shadow-xl hover:shadow-indigo-500/40"
+          >
+            <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            AISHE İndir
+          </a>
+          <div className="mt-6 flex items-center gap-4">
+            <Link
+              href="/dashboard"
+              className="rounded-lg border border-slate-700 px-5 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:text-white"
+            >
+              Panele Git
+            </Link>
+            <button
+              type="button"
+              onClick={() => {
+                setOrderSuccess(false);
+                setSelectedPackageId('');
+                setAisheId('');
+                setCustomSelections({});
+                setNeedsInvoice(false);
+                setInvoiceInfo({ companyName: '', taxNumber: '', taxOffice: '', address: '' });
+              }}
+              className="rounded-lg border border-slate-700 px-5 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:text-white"
+            >
+              Yeni Sipariş
+            </button>
+          </div>
         </div>
       </main>
     );
