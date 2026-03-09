@@ -31,7 +31,26 @@ export class OrdersService {
   async createOrder(buyerId: string, payload: CreateOrderDto): Promise<Order> {
   const pkg = await this.packagesService.getById(payload.packageId);
 
-    const attribution = await this.resolveAttribution(payload.affiliateId, payload.referralCode);
+    // Eğer referralCode payload'da yoksa, kullanıcının referral signup kaydından al
+    let referralCode = payload.referralCode;
+    if (!referralCode) {
+      const signup = await this.prisma.referralSignup.findFirst({
+        where: { newUserId: buyerId },
+        include: {
+          invite: {
+            include: {
+              code: true,
+            },
+          },
+        },
+      });
+      
+      if (signup) {
+        referralCode = signup.invite.code.code;
+      }
+    }
+
+    const attribution = await this.resolveAttribution(payload.affiliateId, referralCode);
 
     // validUntil: 1 ay sonra
     const validUntil = new Date();
