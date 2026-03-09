@@ -7,6 +7,7 @@ import { ErrorCodes } from '../common/errors/error-codes';
 import { UsersRepository } from '../users/users.repository';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { PrismaService } from '../prisma/prisma.service';
 import * as crypto from 'crypto';
 
 const TOKEN_EXPIRES_IN = 60 * 60; // 1 saat
@@ -16,6 +17,7 @@ export class AuthService {
   constructor(
     private readonly usersRepository: UsersRepository,
     private readonly jwtService: JwtService,
+    private readonly prisma: PrismaService,
   ) {}
 
   // Kullanıcı doğrulama (login içindeki temel kontrol)
@@ -68,10 +70,39 @@ export class AuthService {
       roles: { create: [{ role: UserRoleType.USER }] },
     });
 
+    // Yeni kullanıcıya kendi referral code'unu oluştur
+    await this.prisma.referralCode.create({
+      data: {
+        userId: user.id,
+        code: normalizedUsername,
+      },
+    });
+
     // Referral signup kaydı oluştur (eğer referral code geçerliyse)
     if (referralUserId) {
-      // TODO: ReferralSignup tablosuna kayıt ekle
-      // Şimdilik sadece user'ı kaydediyoruz
+      // Referral user'ın code'unu bul
+      const referralCode = await this.prisma.referralCode.findFirst({
+        where: { userId: referralUserId },
+      });
+
+      if (referralCode) {
+        // ReferralInvite oluştur
+        const invite = await this.prisma.referralInvite.create({
+          data: {
+            codeId: referralCode.id,
+            target: payload.email,
+            channel: 'web_registration',
+          },
+        });
+
+        // ReferralSignup oluştur
+        await this.prisma.referralSignup.create({
+          data: {
+            inviteId: invite.id,
+            newUserId: user.id,
+          },
+        });
+      }
     }
 
     return this.issueToken(user);
@@ -118,6 +149,14 @@ export class AuthService {
         passwordHash,
         status: UserStatus.ACTIVE,
         roles: { create: [{ role: UserRoleType.USER }] },
+      });
+
+      // Yeni kullanıcıya kendi referral code'unu oluştur
+      await this.prisma.referralCode.create({
+        data: {
+          userId: user.id,
+          code: username,
+        },
       });
     }
 
