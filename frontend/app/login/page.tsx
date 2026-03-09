@@ -11,8 +11,8 @@ function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login: setAuth } = useAuth();
-  const [email, setEmail] = useState('demo@aishe.local');
-  const [password, setPassword] = useState('Demo123!');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -106,13 +106,7 @@ function LoginContent() {
             Hemen kayıt ol
           </Link>
         </div>
-        <div className="mt-6 rounded-lg border border-slate-800 bg-slate-950/70 p-3 text-xs text-slate-400">
-          Demo giriş (seed): <br />
-          demo@aishe.local / Demo123!
-          <span className="mt-2 block text-slate-500">
-            Admin: admin@aishe.local / ChangeMe123!
-          </span>
-        </div>
+
       </div>
     </main>
   );
