@@ -51,7 +51,7 @@ export class OrdersService {
   const order = await this.ordersRepository.create({
       buyer: { connect: { id: buyerId } },
       package: { connect: { id: pkg.id } },
-      status: OrderStatus.PENDING,
+      status: OrderStatus.PAID, // Direkt PAID olarak oluştur (ödeme sistemi yok)
       amount: calculatedAmount,
       currency: pkg.currency,
       attributionType: attribution.type,
@@ -77,6 +77,22 @@ export class OrdersService {
         currency: order.currency,
         status: order.status,
         attributionType: order.attributionType,
+        affiliateId: order.affiliateId ?? undefined,
+        referralUserId: order.referralUserId ?? undefined,
+      }),
+    );
+
+    // OrderPaid event'ini de tetikle (komisyon/reward hesaplaması için)
+    this.eventEmitter.emit(
+      'order.paid',
+      new OrderPaidEvent({
+        orderId: order.id,
+        buyerId,
+        packageId: pkg.id,
+        amount: order.amount as Prisma.Decimal,
+        currency: order.currency,
+        status: order.status,
+        commissionRate: pkg.commissionRate,
         affiliateId: order.affiliateId ?? undefined,
         referralUserId: order.referralUserId ?? undefined,
       }),
