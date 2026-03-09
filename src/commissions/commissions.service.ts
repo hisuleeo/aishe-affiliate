@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { LedgerEntryType, Prisma } from '@prisma/client';
+import { LedgerEntryType, Prisma, ReferralRewardStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 // Komisyon hesaplama servisi (Rule bazlı yapı)
@@ -92,7 +92,7 @@ export class CommissionsService {
         signupId: signup.id,
         amount: rewardAmount,
         currency: order.currency,
-        status: 'pending',
+        status: ReferralRewardStatus.PENDING,
       },
     });
 
