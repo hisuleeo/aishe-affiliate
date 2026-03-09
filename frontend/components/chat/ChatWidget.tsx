@@ -498,11 +498,10 @@ export default function ChatWidget() {
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        className="flex items-center gap-2 rounded-full border border-indigo-500/40 bg-indigo-500/20 px-4 py-2 text-xs font-semibold text-indigo-100 shadow-[0_12px_30px_rgba(79,70,229,0.35)] transition-all hover:scale-105 hover:shadow-[0_16px_40px_rgba(79,70,229,0.45)] active:scale-95 max-sm:px-3 max-sm:py-1.5 max-sm:text-[10px]"
+        className="group relative flex h-14 w-14 items-center justify-center rounded-full border border-indigo-500/40 bg-slate-950/90 shadow-[0_12px_30px_rgba(79,70,229,0.35)] backdrop-blur transition-all hover:scale-110 hover:shadow-[0_16px_40px_rgba(79,70,229,0.5)] active:scale-95 max-sm:h-12 max-sm:w-12"
       >
-        <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse max-sm:h-1.5 max-sm:w-1.5" />
-        <span className="max-sm:hidden">AISHE Chat</span>
-        <span className="sm:hidden">Chat</span>
+        <img src="/brand/favicon.png" alt="AISHE" className="h-9 w-9 rounded-full object-contain max-sm:h-8 max-sm:w-8" />
+        <span className="absolute -top-0.5 -right-0.5 flex h-3.5 w-3.5 rounded-full border-2 border-slate-950 bg-emerald-400 animate-pulse" />
       </button>
     </div>
   );
