@@ -170,6 +170,7 @@ function OrderContent() {
         packageId: selectedPackage.id,
         aisheId: aisheId.trim(),
         selectedOptions: customSelections[selectedPackage.id] || [],
+        limitSize: selectedPackage.isCustom ? (customLimits[selectedPackage.id] ?? 0.5) : undefined,
         needsInvoice,
         invoiceInfo: needsInvoice ? invoiceInfo : undefined,
       });

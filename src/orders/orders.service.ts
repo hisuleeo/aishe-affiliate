@@ -37,12 +37,15 @@ export class OrdersService {
     const validUntil = new Date();
     validUntil.setMonth(validUntil.getMonth() + 1);
 
-    // Custom paketlerde fiyat hesaplama: base(25) + seçili özellik sayısı × 10
+    // Custom paketlerde fiyat hesaplama: base(25) + özellik sayısı × 10 + limitSize × 50
     let calculatedAmount = Number(pkg.price);
-    if (pkg.isCustom && payload.selectedOptions && payload.selectedOptions.length > 0) {
+    if (pkg.isCustom) {
       const BASE_PRICE = 25;
       const FEATURE_PRICE = 10;
-      calculatedAmount = BASE_PRICE + (payload.selectedOptions.length * FEATURE_PRICE);
+      const LIMIT_PER_UNIT = 50;
+      const featureCount = payload.selectedOptions?.length ?? 0;
+      const limitSize = payload.limitSize ?? 0.5;
+      calculatedAmount = BASE_PRICE + (featureCount * FEATURE_PRICE) + (limitSize * LIMIT_PER_UNIT);
     }
 
   const order = await this.ordersRepository.create({

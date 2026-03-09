@@ -1,4 +1,4 @@
-import { IsArray, IsBoolean, IsObject, IsOptional, IsString, IsUUID, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsNumber, IsObject, IsOptional, IsString, IsUUID, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 class InvoiceInfoDto {
@@ -36,6 +36,10 @@ export class CreateOrderDto {
   @IsArray()
   @IsString({ each: true })
   selectedOptions?: string[];
+
+  @IsOptional()
+  @IsNumber()
+  limitSize?: number;
 
   @IsOptional()
   @IsBoolean()

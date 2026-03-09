@@ -12,6 +12,7 @@ export type CreateOrderPayload = {
   referralCode?: string;
   aisheId?: string;
   selectedOptions?: string[];
+  limitSize?: number;
   needsInvoice?: boolean;
   invoiceInfo?: {
     companyName: string;
