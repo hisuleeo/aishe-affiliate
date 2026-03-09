@@ -55,7 +55,12 @@ function LoginContent() {
             Ana sayfa
           </Link>
         </div>
-        <button className="mt-6 inline-flex w-full items-center justify-center gap-3 rounded-lg border border-slate-700 bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:border-slate-500">
+        <button
+          onClick={() => {
+            window.location.href = `${process.env.NEXT_PUBLIC_API_URL ?? 'https://api.aishe.pro'}/auth/google`;
+          }}
+          className="mt-6 inline-flex w-full items-center justify-center gap-3 rounded-lg border border-slate-700 bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:border-slate-500"
+        >
           <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
             <path
               fill="currentColor"

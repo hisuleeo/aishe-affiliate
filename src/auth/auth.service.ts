@@ -7,6 +7,7 @@ import { ErrorCodes } from '../common/errors/error-codes';
 import { UsersRepository } from '../users/users.repository';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import * as crypto from 'crypto';
 
 const TOKEN_EXPIRES_IN = 60 * 60; // 1 saat
 
@@ -92,5 +93,34 @@ export class AuthService {
       tokenType: 'Bearer' as const,
       expiresIn: TOKEN_EXPIRES_IN,
     };
+  }
+
+  // Google OAuth ile giriş/kayıt
+  async googleLogin(googleUser: { googleId: string; email: string; name: string; avatar?: string }) {
+    if (!googleUser.email) {
+      throw new AppError('Google hesabında e-posta bulunamadı.', 400, ErrorCodes.USER_INVALID_CREDENTIALS);
+    }
+
+    // Kullanıcıyı email ile bul
+    let user = await this.usersRepository.findByEmail(googleUser.email);
+
+    if (!user) {
+      // Yeni kullanıcı oluştur
+      const username = googleUser.email.split('@')[0].replace(/[^a-z0-9_]/gi, '').toLowerCase()
+        + '_' + crypto.randomBytes(3).toString('hex');
+      const randomPassword = crypto.randomBytes(32).toString('hex');
+      const passwordHash = await bcrypt.hash(randomPassword, 12);
+
+      user = await this.usersRepository.create({
+        email: googleUser.email,
+        username,
+        name: googleUser.name || undefined,
+        passwordHash,
+        status: UserStatus.ACTIVE,
+        roles: { create: [{ role: UserRoleType.USER }] },
+      });
+    }
+
+    return this.issueToken(user);
   }
 }
