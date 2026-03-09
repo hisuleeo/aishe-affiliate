@@ -51,7 +51,8 @@ export default function TranslateSelect() {
     const cookieValue = getCookie('googtrans');
     if (!cookieValue) return;
 
-    const [, targetLanguage] = cookieValue.split('/');
+    const parts = cookieValue.split('/');
+    const targetLanguage = parts[2];
     if (!targetLanguage) return;
 
     window.setTimeout(() => {
