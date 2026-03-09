@@ -20,6 +20,11 @@ export const metadata: Metadata = {
   title: "AISHE | Autonomous AI Assistant",
   description:
     "AISHE, yerel çalışan otonom AI asistanıyla analiz, otomasyon ve güvenli kontrol katmanlarını tek panelde sunar.",
+  icons: {
+    icon: "/brand/favicon.png",
+    shortcut: "/brand/favicon.png",
+    apple: "/brand/favicon.png",
+  },
 };
 
 export default function RootLayout({
