@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/components/auth/useAuth';
 import Image from 'next/image';
@@ -11,8 +11,12 @@ function GoogleCallbackContent() {
   const searchParams = useSearchParams();
   const { login } = useAuth();
   const [error, setError] = useState<string | null>(null);
+  const processed = useRef(false);
 
   useEffect(() => {
+    if (processed.current) return;
+    processed.current = true;
+
     const token = searchParams.get('token');
     if (!token) {
       setError('Google girişi başarısız oldu. Lütfen tekrar deneyin.');
@@ -32,22 +36,26 @@ function GoogleCallbackContent() {
           ? 'affiliate' as const
           : 'user' as const;
 
-      login(
-        {
-          id: payload.sub,
-          email: payload.email,
-          name: payload.email,
-          status: 'active',
-          role,
-        },
-        token,
-      );
+      // Önce localStorage'a kaydet
+      const user = {
+        id: payload.sub,
+        email: payload.email,
+        name: payload.email,
+        status: 'active' as const,
+        role,
+      };
 
-      router.replace('/dashboard');
+      login(user, token);
+
+      // Kısa gecikme ile yönlendir (state güncellemesinin tamamlanması için)
+      setTimeout(() => {
+        window.location.href = '/dashboard';
+      }, 100);
     } catch {
       setError('Giriş işlemi sırasında bir hata oluştu.');
     }
-  }, [searchParams, login, router]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   if (error) {
     return (

@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 
 export type UserRole = 'admin' | 'affiliate' | 'user';
 
@@ -50,21 +50,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
   });
 
-  const login = (nextUser: AuthUser, token: string) => {
+  const login = useCallback((nextUser: AuthUser, token: string) => {
     window.localStorage.setItem('auth_token', token);
     window.localStorage.setItem('auth_role', nextUser.role);
     window.localStorage.setItem('auth_user', JSON.stringify(nextUser));
     setUser(nextUser);
-  };
+  }, []);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     window.localStorage.removeItem('auth_token');
     window.localStorage.removeItem('auth_role');
     window.localStorage.removeItem('auth_user');
     setUser(null);
-  };
+  }, []);
 
-  const updateUser = (updates: Partial<AuthUser>) => {
+  const updateUser = useCallback((updates: Partial<AuthUser>) => {
     setUser((prev) => {
       if (!prev) return prev;
       const next = { ...prev, ...updates };
@@ -73,7 +73,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       return next;
     });
-  };
+  }, []);
 
   const value = useMemo(
     () => ({
