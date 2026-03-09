@@ -16,6 +16,7 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [referralCode, setReferralCode] = useState('');
+  const [licenseAccepted, setLicenseAccepted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<{ username?: string; email?: string; password?: string }>({});
@@ -43,6 +44,12 @@ export default function RegisterPage() {
 
     if (password.length < 8) {
       nextErrors.password = 'Şifre en az 8 karakter olmalı.';
+    }
+
+    if (!licenseAccepted) {
+      setError('Devam etmek için Lisans Sözleşmesi\'ni kabul etmelisiniz.');
+      setIsSubmitting(false);
+      return;
     }
 
     if (Object.keys(nextErrors).length > 0) {
@@ -175,6 +182,35 @@ export default function RegisterPage() {
               <li>Referralları ve gelirleri takip edersiniz.</li>
               <li>Ödemeleri kontrol panelinden yönetirsiniz.</li>
             </ul>
+          </div>
+          <div className="flex items-start gap-3">
+            <input
+              id="license"
+              type="checkbox"
+              checked={licenseAccepted}
+              onChange={(e) => setLicenseAccepted(e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-600 bg-slate-950 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-0 accent-indigo-500"
+            />
+            <label htmlFor="license" className="text-xs text-slate-400 leading-relaxed">
+              <a
+                href="/docs/lisans-sozlesmesi.pdf"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-indigo-400 underline hover:text-indigo-300"
+              >
+                Lisans Sözleşmesi
+              </a>
+              &apos;ni ve{' '}
+              <a
+                href="/kvkk"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-indigo-400 underline hover:text-indigo-300"
+              >
+                KVKK Aydınlatma Metni
+              </a>
+              &apos;ni okudum, kabul ediyorum.
+            </label>
           </div>
           {error ? <p className="text-xs text-rose-400">{error}</p> : null}
           <button
