@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/auth/useAuth';
 
 const formatCurrency = (amount: number, currency: string) =>
-  new Intl.NumberFormat('en-US', {
+  new Intl.NumberFormat('tr-TR', {
     style: 'currency',
     currency,
     maximumFractionDigits: 2,
@@ -14,20 +14,23 @@ const formatCurrency = (amount: number, currency: string) =>
 type CustomFeature = {
   id: string;
   label: string;
-  price: number;
 };
 
 const customFeatureOptions: CustomFeature[] = [
-  { id: 'nps', label: 'NPS', price: 2.5 },
-  { id: 'npse', label: 'NPSE', price: 2.5 },
-  { id: 'recording', label: 'Recording', price: 4 },
-  { id: 'recAnalyse', label: 'Rec.Analyse', price: 4 },
-  { id: 'stateAnalyse', label: 'State Analyse', price: 5 },
-  { id: 'aisp', label: 'AISP', price: 3 },
-  { id: 'badList', label: 'Bad List', price: 2 },
-  { id: 'weeklyEvents', label: 'Weekly Events', price: 4 },
-  { id: 'waveInt', label: 'Wave int.', price: 3 },
+  { id: 'nps', label: 'NPS' },
+  { id: 'npse', label: 'NPSE' },
+  { id: 'recording', label: 'Recording' },
+  { id: 'recAnalyse', label: 'Rec.Analyse' },
+  { id: 'stateAnalyse', label: 'State Analyse' },
+  { id: 'aisp', label: 'AISP' },
+  { id: 'badList', label: 'Bad List' },
+  { id: 'weeklyEvents', label: 'Weekly Events' },
+  { id: 'waveInt', label: 'Wave int.' },
 ];
+
+const FEATURE_PRICE = 10; // Her checkbox +10€
+const BASE_PRICE = 25;    // Base fiyat 25€
+const LIMIT_PER_UNIT = 50; // Her 1.0 GB = 50€
 
 const defaultSelected = ['recAnalyse', 'stateAnalyse', 'aisp', 'weeklyEvents'];
 
@@ -35,6 +38,7 @@ export default function PricingSection() {
   const router = useRouter();
   const { isAuthenticated } = useAuth();
   const [selected, setSelected] = useState<string[]>(defaultSelected);
+  const [limitSize, setLimitSize] = useState(0.5);
 
   const selectedFeatures = useMemo(() => {
     const set = new Set(selected);
@@ -45,9 +49,10 @@ export default function PricingSection() {
   }, [selected]);
 
   const totalPrice = useMemo(() => {
-    const base = 25;
-    return selectedFeatures.reduce((sum, feature) => sum + (feature.enabled ? feature.price : 0), base);
-  }, [selectedFeatures]);
+    const checkboxPrice = selected.length * FEATURE_PRICE;
+    const limitPrice = limitSize * LIMIT_PER_UNIT;
+    return BASE_PRICE + checkboxPrice + limitPrice;
+  }, [selected, limitSize]);
 
   const buildOrderUrl = (options?: { packageName?: string; custom?: boolean }) => {
     const params = new URLSearchParams();
@@ -83,7 +88,7 @@ export default function PricingSection() {
             <div className="text-center">
               <h3 className="text-xl font-semibold text-white">Custom</h3>
               <p className="mt-2 text-3xl font-bold text-sky-200">
-                {formatCurrency(totalPrice, 'USD')}
+                {formatCurrency(totalPrice, 'EUR')}
               </p>
               <p className="text-xs text-slate-400">/ Aylık</p>
             </div>
@@ -92,7 +97,7 @@ export default function PricingSection() {
               <p className="text-sm font-semibold text-white">Paket İçerikleri</p>
               <ul className="space-y-2 text-sm text-slate-200">
                 {selectedFeatures.map((feature) => (
-                  <li key={feature.id} className="flex items-center gap-3">
+                  <li key={feature.id}>
                     <label className="flex items-center gap-3">
                       <input
                         type="checkbox"
@@ -106,23 +111,43 @@ export default function PricingSection() {
                         }}
                         className="h-4 w-4 accent-indigo-500"
                       />
-                      <span>{feature.label}</span>
+                      <span className="flex-1">{feature.label}</span>
+                      <span className="text-xs text-slate-400">+€10,00</span>
                     </label>
                   </li>
                 ))}
               </ul>
             </div>
 
-            <p className="mt-6 border-t border-slate-800/60 pt-4 text-center text-sm text-slate-300">
-              Limit size: <span className="font-semibold text-white">0.10</span>
-            </p>
+            <div className="mt-6 border-t border-slate-800/60 pt-4">
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-400 text-center mb-3">Limit Size</p>
+              <div className="flex items-center justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setLimitSize((prev) => Math.max(0.1, Number((prev - 0.1).toFixed(2))))}
+                  className="h-9 w-9 rounded-xl border border-slate-700 bg-slate-950/70 text-lg text-slate-200 hover:bg-slate-800 transition"
+                >
+                  -
+                </button>
+                <div className="flex h-9 min-w-[80px] items-center justify-center rounded-xl border border-slate-700 bg-slate-950/60 text-sm font-semibold text-white">
+                  {limitSize.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setLimitSize((prev) => Number((prev + 0.1).toFixed(2)))}
+                  className="h-9 w-9 rounded-xl border border-slate-700 bg-slate-950/70 text-lg text-slate-200 hover:bg-slate-800 transition"
+                >
+                  +
+                </button>
+              </div>
+            </div>
 
             <button
               type="button"
               onClick={() => handleBuy({ custom: true, packageName: 'Custom' })}
               className="mt-5 w-full rounded-2xl bg-gradient-to-r from-indigo-500 to-sky-500 py-3 text-sm font-semibold text-white"
             >
-              Buy
+              Satın Al
             </button>
           </div>
         </div>
