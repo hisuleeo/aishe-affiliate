@@ -234,15 +234,14 @@ function OrderContent() {
             Siparişiniz başarıyla oluşturuldu. AISHE uygulamasını indirip kurulumu tamamlayabilirsiniz.
           </p>
           <a
-            href="https://aishe.ai"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="/docs/Aishe_Install.exe"
+            download="Aishe_Install.exe"
             className="mt-8 inline-flex items-center gap-3 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 px-8 py-4 text-base font-bold text-white shadow-lg shadow-indigo-500/30 transition-all hover:scale-105 hover:shadow-xl hover:shadow-indigo-500/40"
           >
             <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
-            AISHE İndir
+            AISHE İndir (.exe)
           </a>
           <div className="mt-6 flex items-center gap-4">
             <Link
