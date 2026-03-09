@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 type LanguageOption = {
   code: string;
@@ -10,8 +10,8 @@ type LanguageOption = {
 };
 
 const LANGUAGE_OPTIONS: LanguageOption[] = [
-  { code: 'en', label: 'English', short: 'EN', flag: '🇬🇧' },
   { code: 'tr', label: 'Türkçe', short: 'TR', flag: '🇹🇷' },
+  { code: 'en', label: 'English', short: 'EN', flag: '🇬🇧' },
   { code: 'de', label: 'Deutsch', short: 'DE', flag: '🇩🇪' },
   { code: 'fr', label: 'Français', short: 'FR', flag: '🇫🇷' },
   { code: 'es', label: 'Español', short: 'ES', flag: '🇪🇸' },
@@ -25,91 +25,88 @@ const LANGUAGE_OPTIONS: LanguageOption[] = [
   { code: 'hi', label: 'हिन्दी', short: 'HI', flag: '🇮🇳' },
 ];
 
-const DEFAULT_LANGUAGE = 'tr';
 const SOURCE_LANGUAGE = 'tr';
 
-const getCookie = (name: string) => {
-  if (typeof document === 'undefined') return null;
-  const match = document.cookie.match(new RegExp(`(^| )${name}=([^;]+)`));
-  return match ? decodeURIComponent(match[2]) : null;
-};
+function getGoogTransLang(): string {
+  if (typeof document === 'undefined') return SOURCE_LANGUAGE;
+  const match = document.cookie.match(/googtrans=\/[^/]+\/([^;]+)/);
+  return match?.[1] || SOURCE_LANGUAGE;
+}
 
-const setTranslateCookie = (targetLanguage: string) => {
+function setGoogTransCookies(lang: string) {
   if (typeof document === 'undefined') return;
-  const value = `/${SOURCE_LANGUAGE}/${targetLanguage}`;
-  document.cookie = `googtrans=${value}; path=/`;
-  document.cookie = `googtrans=${value}; path=/; domain=${window.location.hostname}`;
-};
+  const val = `/${SOURCE_LANGUAGE}/${lang}`;
+  // Ana domain ve tüm path'ler için cookie set et
+  document.cookie = `googtrans=${val}; path=/; SameSite=Lax`;
+  // Alt domain cookie'sini de set et
+  const host = window.location.hostname;
+  const rootDomain = host.split('.').slice(-2).join('.');
+  document.cookie = `googtrans=${val}; path=/; domain=.${rootDomain}; SameSite=Lax`;
+}
+
+function clearGoogTransCookies() {
+  if (typeof document === 'undefined') return;
+  document.cookie = 'googtrans=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+  const host = window.location.hostname;
+  const rootDomain = host.split('.').slice(-2).join('.');
+  document.cookie = `googtrans=; path=/; domain=.${rootDomain}; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+}
+
+function triggerGoogleTranslate(lang: string): boolean {
+  const combo = document.querySelector<HTMLSelectElement>('.goog-te-combo');
+  if (!combo) return false;
+  combo.value = lang;
+  combo.dispatchEvent(new Event('change'));
+  return true;
+}
 
 export default function TranslateSelect() {
-  const [selected, setSelected] = useState(DEFAULT_LANGUAGE);
-  const [isReady, setIsReady] = useState(false);
+  const [selected, setSelected] = useState(SOURCE_LANGUAGE);
+  const isInitialized = useRef(false);
 
-  const options = useMemo(() => LANGUAGE_OPTIONS, []);
-
+  // Mount'ta cookie'den oku
   useEffect(() => {
-    const cookieValue = getCookie('googtrans');
-    if (!cookieValue) return;
-
-    const parts = cookieValue.split('/');
-    const targetLanguage = parts[2];
-    if (!targetLanguage) return;
-
-    window.setTimeout(() => {
-      setSelected((current) => (current === targetLanguage ? current : targetLanguage));
-    }, 0);
+    const lang = getGoogTransLang();
+    setSelected(lang);
+    isInitialized.current = true;
   }, []);
 
-  useEffect(() => {
-    const waitForCombo = () => {
-      const combo = document.querySelector<HTMLSelectElement>('.goog-te-combo');
-      if (combo) {
-        setIsReady(true);
-        combo.value = selected;
-        combo.dispatchEvent(new Event('change'));
-        return true;
-      }
-      return false;
-    };
+  const handleChange = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
+    const lang = event.target.value;
+    setSelected(lang);
 
-    if (waitForCombo()) return;
-
-    const intervalId = window.setInterval(() => {
-      if (waitForCombo()) {
-        window.clearInterval(intervalId);
-      }
-    }, 500);
-
-    const timeoutId = window.setTimeout(() => window.clearInterval(intervalId), 15000);
-
-    return () => {
-      window.clearInterval(intervalId);
-      window.clearTimeout(timeoutId);
-    };
-  }, [selected]);
-
-  const handleChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = event.target.value;
-    setSelected(value);
-    setTranslateCookie(value);
-
-    const combo = document.querySelector<HTMLSelectElement>('.goog-te-combo');
-    if (combo) {
-      combo.value = value;
-      combo.dispatchEvent(new Event('change'));
+    // Türkçe'ye dönüyorsa cookie'yi temizle
+    if (lang === SOURCE_LANGUAGE) {
+      clearGoogTransCookies();
+      // Google Translate frame'ini kaldır
+      const frame = document.querySelector('.goog-te-banner-frame');
+      if (frame) (frame as HTMLElement).style.display = 'none';
+      // Sayfayı reload et (temiz Türkçe)
+      window.location.reload();
       return;
     }
 
-    window.setTimeout(() => {
-      const retryCombo = document.querySelector<HTMLSelectElement>('.goog-te-combo');
-      if (retryCombo) {
-        retryCombo.value = value;
-        retryCombo.dispatchEvent(new Event('change'));
+    // Cookie'yi set et
+    setGoogTransCookies(lang);
+
+    // Google Translate combo'sunu tetiklemeyi dene
+    if (triggerGoogleTranslate(lang)) return;
+
+    // Combo henüz yüklenmemişse biraz bekle, yine olmazsa reload
+    let attempts = 0;
+    const interval = window.setInterval(() => {
+      attempts++;
+      if (triggerGoogleTranslate(lang)) {
+        window.clearInterval(interval);
         return;
       }
-      window.location.reload();
-    }, 600);
-  };
+      if (attempts >= 5) {
+        window.clearInterval(interval);
+        // Cookie set edildi, reload ile Google Translate otomatik çalışır
+        window.location.reload();
+      }
+    }, 300);
+  }, []);
 
   return (
     <div className="translate-custom">
@@ -122,9 +119,8 @@ export default function TranslateSelect() {
           value={selected}
           onChange={handleChange}
           className="translate-custom__select"
-          aria-busy={!isReady}
         >
-          {options.map((option) => (
+          {LANGUAGE_OPTIONS.map((option) => (
             <option key={option.code} value={option.code}>
               {option.flag} {option.short}
             </option>
