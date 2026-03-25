@@ -55,15 +55,15 @@ export default function CookieConsent() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                       </svg>
                     </div>
-                    <h3 className="text-lg font-bold text-white">🍪 Çerez Tercihleri</h3>
+                    <h3 className="text-lg font-bold text-white">🍪 Cookie Preferences</h3>
                   </div>
                   <p className="text-sm text-slate-300 leading-relaxed max-w-2xl">
-                    Web sitemizde deneyiminizi geliştirmek ve size özel içerik sunabilmek için çerezler kullanıyoruz. 
+                    We use cookies to enhance your experience on our website and provide you with personalized content. 
                     <button
                       onClick={() => setShowModal(true)}
                       className="ml-1 font-semibold text-indigo-400 hover:text-indigo-300 underline transition"
                     >
-                      Detaylı bilgi
+                      More details
                     </button>
                   </p>
                 </div>
@@ -73,14 +73,14 @@ export default function CookieConsent() {
                     onClick={acceptNecessary}
                     className="group relative overflow-hidden rounded-xl border border-slate-600 bg-slate-800/80 px-6 py-2.5 text-sm font-semibold text-slate-200 transition hover:bg-slate-700/80 hover:border-slate-500"
                   >
-                    <span className="relative z-10">Sadece Gerekli</span>
+                    <span className="relative z-10">Necessary Only</span>
                   </button>
                   <button
                     onClick={acceptAll}
                     className="group relative overflow-hidden rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 px-8 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/50 transition hover:shadow-xl hover:shadow-indigo-500/60 hover:scale-105"
                   >
                     <span className="relative z-10 flex items-center gap-2">
-                      Tümünü Kabul Et
+                      Accept All
                       <svg className="h-4 w-4 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
@@ -113,8 +113,8 @@ export default function CookieConsent() {
                     </svg>
                   </div>
                   <div>
-                    <h2 className="text-2xl font-bold text-white">Çerez Politikası</h2>
-                    <p className="text-sm text-slate-400">Gizliliğiniz bizim için önemli</p>
+                    <h2 className="text-2xl font-bold text-white">Cookie Policy</h2>
+                    <p className="text-sm text-slate-400">Your privacy matters to us</p>
                   </div>
                 </div>
                 <button
@@ -133,9 +133,9 @@ export default function CookieConsent() {
               <div className="space-y-6 text-slate-300">
                 <section>
                   <p className="leading-relaxed">
-                    AISHE olarak, web sitemizde çeşitli amaçlarla çerezler kullanıyoruz. 
-                    Çerezler, cihazınızda saklanan küçük metin dosyalarıdır ve web deneyiminizi 
-                    iyileştirmemize yardımcı olur.
+                    As AISHE, we use cookies on our website for various purposes. 
+                    Cookies are small text files stored on your device and help us 
+                    improve your web experience.
                   </p>
                 </section>
 
@@ -149,13 +149,13 @@ export default function CookieConsent() {
                       </div>
                       <div className="flex-1">
                         <h3 className="mb-2 text-lg font-semibold text-white">
-                          Zorunlu Çerezler
-                          <span className="ml-2 text-xs font-normal text-green-400">(Her zaman aktif)</span>
+                          Necessary Cookies
+                          <span className="ml-2 text-xs font-normal text-green-400">(Always active)</span>
                         </h3>
                         <p className="text-sm leading-relaxed text-slate-400">
-                          Bu çerezler, web sitesinin temel işlevlerini yerine getirmesi için gereklidir. 
-                          Güvenli oturum yönetimi, kimlik doğrulama ve site güvenliği için kullanılır. 
-                          Devre dışı bırakılamaz.
+                          These cookies are essential for the website's basic functions. 
+                          Used for secure session management, authentication, and site security. 
+                          Cannot be disabled.
                         </p>
                       </div>
                     </div>
@@ -169,11 +169,11 @@ export default function CookieConsent() {
                         </svg>
                       </div>
                       <div className="flex-1">
-                        <h3 className="mb-2 text-lg font-semibold text-white">Analitik Çerezler</h3>
+                        <h3 className="mb-2 text-lg font-semibold text-white">Analytics Cookies</h3>
                         <p className="text-sm leading-relaxed text-slate-400">
-                          Web sitesi trafiğini ve kullanıcı davranışlarını analiz etmek için kullanılır. 
-                          Hangi sayfaların daha popüler olduğunu ve ziyaretçilerin sitemizde nasıl 
-                          gezindiğini anlamamıza yardımcı olur. (Google Analytics)
+                          Used to analyze website traffic and user behavior. 
+                          Helps us understand which pages are more popular and how 
+                          visitors navigate our site. (Google Analytics)
                         </p>
                       </div>
                     </div>
@@ -187,11 +187,11 @@ export default function CookieConsent() {
                         </svg>
                       </div>
                       <div className="flex-1">
-                        <h3 className="mb-2 text-lg font-semibold text-white">Pazarlama Çerezleri</h3>
+                        <h3 className="mb-2 text-lg font-semibold text-white">Marketing Cookies</h3>
                         <p className="text-sm leading-relaxed text-slate-400">
-                          Size özel içerik ve reklamlar sunmak için kullanılır. İlgi alanlarınıza göre 
-                          kişiselleştirilmiş deneyim yaşamanızı sağlar. Üçüncü taraf reklam platformları 
-                          ile entegre çalışabilir.
+                          Used to provide you with personalized content and advertisements. 
+                          Enables you to have a customized experience based on your interests. 
+                          May integrate with third-party advertising platforms.
                         </p>
                       </div>
                     </div>
@@ -199,19 +199,19 @@ export default function CookieConsent() {
                 </section>
 
                 <section className="rounded-xl border border-indigo-500/30 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 p-6">
-                  <h3 className="mb-3 text-lg font-semibold text-white">📋 Saklama Süreleri</h3>
+                  <h3 className="mb-3 text-lg font-semibold text-white">📋 Storage Periods</h3>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <span>Oturum Çerezleri:</span>
-                      <span className="font-semibold text-indigo-400">Tarayıcı kapatılana kadar</span>
+                      <span>Session Cookies:</span>
+                      <span className="font-semibold text-indigo-400">Until browser closes</span>
                     </div>
                     <div className="flex justify-between">
-                      <span>Kalıcı Çerezler:</span>
-                      <span className="font-semibold text-indigo-400">En fazla 2 yıl</span>
+                      <span>Persistent Cookies:</span>
+                      <span className="font-semibold text-indigo-400">Maximum 2 years</span>
                     </div>
                     <div className="flex justify-between">
-                      <span>Analitik Çerezler:</span>
-                      <span className="font-semibold text-indigo-400">13 ay</span>
+                      <span>Analytics Cookies:</span>
+                      <span className="font-semibold text-indigo-400">13 months</span>
                     </div>
                   </div>
                 </section>
@@ -221,22 +221,22 @@ export default function CookieConsent() {
                     <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>
-                    Tercihlerinizi Yönetme
+                    Managing Your Preferences
                   </h3>
                   <p className="text-sm leading-relaxed text-slate-300">
-                    Çerez tercihlerinizi istediğiniz zaman değiştirebilirsiniz. Tarayıcı ayarlarınızdan 
-                    çerezleri silebilir veya engelleyebilirsiniz. Ancak bazı çerezleri devre dışı 
-                    bırakmanız durumunda, web sitesinin bazı özellikleri düzgün çalışmayabilir.
+                    You can change your cookie preferences at any time. You can delete or block 
+                    cookies from your browser settings. However, if you disable some cookies, 
+                    some features of the website may not work properly.
                   </p>
                 </section>
 
                 <section className="text-sm text-slate-400">
                   <p>
-                    Daha fazla bilgi için{' '}
+                    For more information, please review our{' '}
                     <Link href="/kvkk" className="font-semibold text-indigo-400 hover:text-indigo-300 underline">
-                      KVKK Aydınlatma Metni
+                      Privacy Policy
                     </Link>
-                    'ni inceleyebilirsiniz.
+                    .
                   </p>
                 </section>
               </div>
@@ -252,7 +252,7 @@ export default function CookieConsent() {
                   }}
                   className="rounded-xl border border-slate-600 bg-slate-800/80 px-6 py-2.5 text-sm font-semibold text-slate-200 transition hover:bg-slate-700/80 hover:border-slate-500"
                 >
-                  Sadece Gerekli Çerezler
+                  Necessary Cookies Only
                 </button>
                 <button
                   onClick={() => {
@@ -262,7 +262,7 @@ export default function CookieConsent() {
                   className="group relative overflow-hidden rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 px-8 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/50 transition hover:shadow-xl hover:shadow-indigo-500/60 hover:scale-105"
                 >
                   <span className="relative z-10 flex items-center justify-center gap-2">
-                    Tümünü Kabul Et
+                    Accept All
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>

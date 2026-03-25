@@ -12,6 +12,15 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { getPackages } from '@/services/packageService';
 import { createOrder } from '@/services/orderService';
 
+// Cookie helper function
+function getCookie(name: string): string | null {
+  if (typeof document === 'undefined') return null;
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
+  return null;
+}
+
 const formatCurrency = (amount: string | number, currency: string) => {
   const value = Number(amount);
   return new Intl.NumberFormat('tr-TR', {
@@ -110,13 +119,13 @@ function OrderContent() {
   }, [packages.length, packagesLoading, requestedPackage, searchParams]);
 
   const getCustomPrice = (pkg: Package, selected: string[], limit: number) => {
-    // Base price: 25€
+    // Base price: 25$
     const basePrice = 25;
     
-    // Her checkbox: +10€
-    const checkboxPrice = selected.length * 10;
+    // Her checkbox: +25$
+    const checkboxPrice = selected.length * 25;
     
-    // Limit size fiyatı: Her 0.1 GB için 5€ (0.5 GB = 25€, 1.0 GB = 50€)
+    // Limit size fiyatı: Her 0.1 GB için 5$ (0.5 GB = 25$, 1.0 GB = 50$)
     const limitPrice = limit * 50;
     
     return basePrice + checkboxPrice + limitPrice;
@@ -140,14 +149,14 @@ function OrderContent() {
 
   const handleOrder = async () => {
     if (!selectedPackage) {
-      showToast({ title: 'Lütfen bir paket seçin', variant: 'error' });
+      showToast({ title: 'Please select a package', variant: 'error' });
       return;
     }
 
     if (!aisheId.trim()) {
       showToast({
-        title: 'AISHE ID gerekli',
-        description: 'Siparişe devam etmek için bilgisayar kimliğinizi girin.',
+        title: 'AISHE ID required',
+        description: 'Please enter your computer ID to proceed with the order.',
         variant: 'error',
       });
       return;
@@ -157,8 +166,8 @@ function OrderContent() {
       if (!invoiceInfo.companyName.trim() || !invoiceInfo.taxNumber.trim() || 
           !invoiceInfo.taxOffice.trim() || !invoiceInfo.address.trim()) {
         showToast({
-          title: 'Fatura bilgileri eksik',
-          description: 'Lütfen tüm fatura bilgilerini doldurun.',
+          title: 'Invoice information missing',
+          description: 'Please fill in all invoice information.',
           variant: 'error',
         });
         return;
@@ -167,6 +176,9 @@ function OrderContent() {
 
     setIsSubmitting(true);
     try {
+      // Get affiliate code from cookie
+      const affiliateCode = getCookie('aishe_ref');
+      
       await createOrder({ 
         packageId: selectedPackage.id,
         aisheId: aisheId.trim(),
@@ -174,17 +186,18 @@ function OrderContent() {
         limitSize: selectedPackage.isCustom ? (customLimits[selectedPackage.id] ?? 0.5) : undefined,
         needsInvoice,
         invoiceInfo: needsInvoice ? invoiceInfo : undefined,
+        affiliateCode: affiliateCode || undefined,
       });
       showToast({
-        title: 'Sipariş oluşturuldu',
-        description: 'Siparişiniz başarıyla alındı.',
+        title: 'Order created',
+        description: 'Your order has been successfully placed.',
         variant: 'success',
       });
       setOrderSuccess(true);
     } catch {
       showToast({
-        title: 'Sipariş oluşturulamadı',
-        description: 'Lütfen tekrar deneyin.',
+        title: 'Order could not be created',
+        description: 'Please try again.',
         variant: 'error',
       });
     } finally {
@@ -206,8 +219,8 @@ function OrderContent() {
     return (
       <main className="min-h-screen bg-slate-950 text-white">
         <header className="sticky top-0 z-40 border-b border-slate-800/70 bg-slate-950/95 backdrop-blur">
-          <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-6 py-4">
-            <div className="flex items-center gap-3">
+          <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 py-3 sm:py-4">
+            <Link href="/" className="flex items-center gap-3">
               <Image
                 src="/brand/aishelogo.png"
                 alt="AISHE"
@@ -216,22 +229,22 @@ function OrderContent() {
                 className="h-8 w-auto object-contain"
                 priority
               />
-            </div>
-            <nav className="flex items-center gap-6 text-sm text-slate-300">
+            </Link>
+            <nav className="flex items-center gap-4 sm:gap-6 text-sm text-slate-300">
               <Link href="/" className="transition hover:text-white">Ana sayfa</Link>
               <Link href="/dashboard" className="transition hover:text-white">Panel</Link>
             </nav>
           </div>
         </header>
-        <div className="mx-auto flex max-w-lg flex-col items-center justify-center px-6 py-24 text-center">
+        <div className="mx-auto flex max-w-lg flex-col items-center justify-center px-4 sm:px-6 py-16 sm:py-24 text-center">
           <div className="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/20 border border-emerald-500/40">
             <svg className="h-10 w-10 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h1 className="mt-6 text-3xl font-bold text-white">Siparişiniz Alındı!</h1>
+          <h1 className="mt-6 text-3xl font-bold text-white">Order Received!</h1>
           <p className="mt-3 text-sm text-slate-400">
-            Siparişiniz başarıyla oluşturuldu. AISHE uygulamasını indirip kurulumu tamamlayabilirsiniz.
+            Your order has been successfully created. You can download the AISHE application and complete the setup.
           </p>
           <a
             href="/docs/Aishe_Install.exe"
@@ -248,7 +261,7 @@ function OrderContent() {
               href="/dashboard"
               className="rounded-lg border border-slate-700 px-5 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:text-white"
             >
-              Panele Git
+              Go to Dashboard
             </Link>
             <button
               type="button"
@@ -262,7 +275,7 @@ function OrderContent() {
               }}
               className="rounded-lg border border-slate-700 px-5 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:text-white"
             >
-              Yeni Sipariş
+              New Order
             </button>
           </div>
         </div>
@@ -273,7 +286,7 @@ function OrderContent() {
   return (
     <main className="min-h-screen bg-slate-950 text-white">
       <header className="sticky top-0 z-40 border-b border-slate-800/70 bg-slate-950/95 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-6 py-4">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 py-3 sm:py-4">
           <div className="flex items-center gap-3">
             <Image
               src="/brand/aishelogo.png"
@@ -284,18 +297,18 @@ function OrderContent() {
               priority
             />
             <span className="hidden text-xs uppercase tracking-[0.3em] text-slate-500 md:inline">
-              Sipariş Oluştur
+              Create Order
             </span>
           </div>
           <nav className="hidden items-center gap-6 text-sm text-slate-300 md:flex">
             <Link href="/" className="transition hover:text-white">
-              Ana sayfa
+              Home
             </Link>
             <Link href="/dashboard" className="transition hover:text-white">
-              Panel
+              Dashboard
             </Link>
             <Link href="/profile" className="transition hover:text-white">
-              Profilim
+              Profile
             </Link>
           </nav>
           <button
@@ -316,35 +329,35 @@ function OrderContent() {
                 className="text-sm text-slate-300 hover:text-white transition py-2"
                 onClick={() => setMobileMenuOpen(false)}
               >
-                Ana sayfa
+                Home
               </Link>
               <Link 
                 href="/dashboard" 
                 className="text-sm text-slate-300 hover:text-white transition py-2"
                 onClick={() => setMobileMenuOpen(false)}
               >
-                Panel
+                Dashboard
               </Link>
               <Link 
                 href="/profile" 
                 className="text-sm text-slate-300 hover:text-white transition py-2"
                 onClick={() => setMobileMenuOpen(false)}
               >
-                Profilim
+                Profile
               </Link>
             </nav>
           </div>
         )}
       </header>
 
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-10">
-        <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-8 shadow-2xl">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 sm:px-6 py-6 sm:py-10">
+        <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-4 sm:p-8 shadow-2xl">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Sipariş oluştur</p>
-              <h1 className="mt-2 text-2xl font-semibold">Siparişini Tamamla</h1>
+              <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Create order</p>
+              <h1 className="mt-2 text-2xl font-semibold">Complete Your Order</h1>
               <p className="mt-2 text-sm text-slate-300">
-                Seçtiğiniz paketi onaylayın ve bilgilerinizi tamamlayın.
+                Confirm your selected package and complete your information.
               </p>
             </div>
             <div className="rounded-full border border-indigo-500/40 bg-indigo-500/10 px-4 py-2 text-xs text-indigo-200">
@@ -357,7 +370,7 @@ function OrderContent() {
           </div>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
           <div className="space-y-4">
             {visiblePackages.length === 0 ? (
               <EmptyState
@@ -441,7 +454,7 @@ function OrderContent() {
                                 />
                                 <span className="flex-1">{option.label}</span>
                                 <span className="text-xs text-slate-400">
-                                  +€10,00
+                                  +$25.00
                                 </span>
                               </label>
                             );
@@ -513,7 +526,7 @@ function OrderContent() {
             )}
           </div>
 
-          <div className="rounded-[28px] border border-slate-800/70 bg-slate-950/40 p-6">
+          <div className="rounded-[28px] border border-slate-800/70 bg-slate-950/40 p-4 sm:p-6">
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-xs uppercase tracking-[0.3em] text-slate-500">AISHE ID</p>
@@ -531,13 +544,13 @@ function OrderContent() {
               value={aisheId}
               onChange={(event) => setAisheId(event.target.value)}
               placeholder="ComputerIdPlaceholder"
-              className="mt-4 w-full rounded-2xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-sm text-white placeholder:text-slate-500"
+              className="mt-4 w-full rounded-2xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-base text-white placeholder:text-slate-500 min-h-[44px]"
             />
 
             <div className="mt-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-100">
               <p className="font-semibold">Açıklama alanına bilgisayar ID&apos;nizi yazmanız zorunludur.</p>
               <p className="mt-2 text-amber-100/80">
-                1) Kurulum sırasında oluşturulan ID&apos;yi Dosya Gezgini&apos;nden kopyalayın.
+                1) Copy the ID generated during installation from File Explorer.
                 2) Drive altındaki dosyayı açıp ID&apos;yi kopyalayın.
                 3) Buraya manuel olarak yapıştırın.
               </p>
@@ -552,7 +565,7 @@ function OrderContent() {
               <div className="mt-6">
                 <EmptyState
                   title="Paket seçilmedi"
-                  description="Soldan bir paket seçtiğinizde burada özetlenecek."
+                  description="When you select a package from the left, it will be summarized here."
                 />
               </div>
             ) : (
@@ -608,41 +621,41 @@ function OrderContent() {
                       onChange={(e) => setNeedsInvoice(e.target.checked)}
                       className="sr-only"
                     />
-                    <span className="text-sm text-slate-200">Fatura İstiyorum</span>
+                    <span className="text-sm text-slate-200">I Want an Invoice</span>
                   </label>
 
                   {needsInvoice && (
                     <div className="mt-4 space-y-3 pt-4 border-t border-slate-700/50">
                       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-                        Fatura Bilgileri
+                        Invoice Information
                       </p>
                       <input
                         type="text"
                         value={invoiceInfo.companyName}
                         onChange={(e) => setInvoiceInfo({ ...invoiceInfo, companyName: e.target.value })}
-                        placeholder="Şirket/Firma Adı"
-                        className="w-full rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-white placeholder:text-slate-500"
+                        placeholder="Company/Firm Name"
+                        className="w-full rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-base text-white placeholder:text-slate-500 min-h-[44px]"
                       />
                       <input
                         type="text"
                         value={invoiceInfo.taxNumber}
                         onChange={(e) => setInvoiceInfo({ ...invoiceInfo, taxNumber: e.target.value })}
-                        placeholder="Vergi Numarası"
-                        className="w-full rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-white placeholder:text-slate-500"
+                        placeholder="Tax Number"
+                        className="w-full rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-base text-white placeholder:text-slate-500 min-h-[44px]"
                       />
                       <input
                         type="text"
                         value={invoiceInfo.taxOffice}
                         onChange={(e) => setInvoiceInfo({ ...invoiceInfo, taxOffice: e.target.value })}
-                        placeholder="Vergi Dairesi"
-                        className="w-full rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-white placeholder:text-slate-500"
+                        placeholder="Tax Office"
+                        className="w-full rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-base text-white placeholder:text-slate-500 min-h-[44px]"
                       />
                       <textarea
                         value={invoiceInfo.address}
                         onChange={(e) => setInvoiceInfo({ ...invoiceInfo, address: e.target.value })}
-                        placeholder="Fatura Adresi"
+                        placeholder="Invoice Address"
                         rows={3}
-                        className="w-full rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-white placeholder:text-slate-500 resize-none"
+                        className="w-full rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-base text-white placeholder:text-slate-500 resize-none"
                       />
                     </div>
                   )}
@@ -650,11 +663,11 @@ function OrderContent() {
 
                 <div className="rounded-xl border border-slate-800/70 bg-slate-950/60 p-4">
                   <div className="flex items-center justify-between text-sm font-semibold text-white">
-                    <span>Toplam</span>
+                    <span>Total</span>
                     <span>{formatCurrency(totalPrice, selectedPackage.currency)}</span>
                   </div>
                   <p className="mt-2 text-xs text-slate-400">
-                    Sipariş sonrası paketlerim bölümünden takip edebilirsiniz.
+                    You can track from the My Packages section after the order.
                   </p>
                 </div>
 
@@ -662,15 +675,80 @@ function OrderContent() {
                   type="button"
                   disabled={isSubmitting}
                   onClick={handleOrder}
-                  className="w-full rounded-full bg-indigo-500 px-4 py-2 text-xs font-semibold text-white disabled:opacity-60"
+                  className="w-full rounded-full bg-indigo-500 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60 min-h-[44px]"
                 >
-                  {isSubmitting ? 'Sipariş oluşturuluyor...' : 'Siparişi Tamamla'}
+                  {isSubmitting ? 'Creating order...' : 'Complete Order'}
                 </button>
               </div>
             )}
           </div>
         </div>
       </div>
+
+      <footer className="border-t border-slate-800 bg-slate-950 py-10 sm:py-16">
+        <div className="mx-auto flex max-w-6xl flex-col gap-10 sm:gap-12 px-4 sm:px-6">
+          <div className="grid gap-8 sm:gap-10 grid-cols-2 md:grid-cols-[1.2fr_1fr_1fr_1fr]">
+            <div className="space-y-4">
+              <Image
+                src="/brand/aishelogo.png"
+                alt="AISHE"
+                width={160}
+                height={48}
+                className="h-10 w-auto object-contain"
+              />
+              <p className="max-w-xs text-sm text-slate-400">
+                Discover the AI-powered autonomous finance experience today.
+              </p>
+              <div className="text-xs text-slate-500 space-y-1">
+                <p>AISHE Technology Inc.</p>
+                <p>Tuna Mah. 1690 Sk. Saader Cebeci Business Center No:48</p>
+                <p>Suite No:102 Karşıyaka/Izmir</p>
+              </div>
+            </div>
+            <div className="space-y-3 text-sm text-slate-300">
+              <p className="text-base font-semibold text-white">Quick Links</p>
+              <Link href="/" className="block transition hover:text-white">Home</Link>
+              <a href="/#faq" className="block transition hover:text-white">FAQ</a>
+              <a href="#" className="block transition hover:text-white">Contact</a>
+              <Link href="/kvkk" className="block transition hover:text-white">KVKK</Link>
+            </div>
+            <div className="space-y-3 text-sm text-slate-300">
+              <p className="text-base font-semibold text-white">Support</p>
+              <a href="/#faq" className="block transition hover:text-white">FAQ</a>
+              <a href="mailto:info@ainengroup.com" className="block transition hover:text-white">info@ainengroup.com</a>
+              <a href="tel:+905323508035" className="block transition hover:text-white">+90 532 350 80 35</a>
+            </div>
+            <div className="space-y-3 text-sm text-slate-300">
+              <p className="text-base font-semibold text-white">Social Media</p>
+              <div className="flex items-center gap-4 text-slate-400">
+                <a href="https://discord.com" aria-label="Discord" className="transition hover:text-white">
+                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden="true">
+                    <path d="M20.317 4.37a19.79 19.79 0 0 0-4.885-1.51.07.07 0 0 0-.073.035c-.211.375-.444.864-.608 1.249-1.844-.276-3.68-.276-5.487 0-.164-.399-.406-.874-.617-1.249a.07.07 0 0 0-.073-.035 19.736 19.736 0 0 0-4.885 1.51.066.066 0 0 0-.03.027C.533 9.046-.32 13.58.099 18.057a.078.078 0 0 0 .03.054 19.9 19.9 0 0 0 5.993 3.03.07.07 0 0 0 .079-.027c.462-.63.873-1.295 1.226-1.995a.07.07 0 0 0-.04-.097 13.107 13.107 0 0 1-1.87-.9.07.07 0 0 1-.007-.117c.126-.095.252-.194.371-.294a.07.07 0 0 1 .073-.01c3.927 1.793 8.18 1.793 12.061 0a.07.07 0 0 1 .074.01c.12.1.245.2.372.294a.07.07 0 0 1-.006.117 12.3 12.3 0 0 1-1.87.9.07.07 0 0 0-.04.097c.36.698.77 1.363 1.225 1.995a.07.07 0 0 0 .079.027 19.9 19.9 0 0 0 6.003-3.03.078.078 0 0 0 .03-.054c.5-5.177-.838-9.673-3.549-13.66a.061.061 0 0 0-.03-.027ZM8.02 15.331c-1.183 0-2.156-1.085-2.156-2.419 0-1.333.955-2.418 2.156-2.418 1.21 0 2.175 1.095 2.156 2.418 0 1.334-.955 2.419-2.156 2.419Zm7.975 0c-1.183 0-2.156-1.085-2.156-2.419 0-1.333.955-2.418 2.156-2.418 1.21 0 2.175 1.095 2.156 2.418 0 1.334-.946 2.419-2.156 2.419Z" />
+                  </svg>
+                </a>
+                <a href="https://x.com" aria-label="X" className="transition hover:text-white">
+                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden="true">
+                    <path d="M17.53 2H21l-7.56 8.64L22 22h-6.9l-5.4-7.02L3.9 22H.5l8.1-9.26L2 2h7.1l4.86 6.32L17.53 2Zm-1.22 18h1.92L7.8 4H5.76l10.55 16Z" />
+                  </svg>
+                </a>
+                <a href="https://instagram.com" aria-label="Instagram" className="transition hover:text-white">
+                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden="true">
+                    <path d="M7 3h10a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4Zm10 2H7a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2Zm-5 3.5a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11Zm0 2a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Zm6-3.25a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5Z" />
+                  </svg>
+                </a>
+              </div>
+            </div>
+          </div>
+          <div className="border-t border-slate-800/70 pt-6 text-center text-xs text-slate-500">
+            © 2026 AISHE. All rights reserved.
+            <span className="mx-3">•</span>
+            <Link href="/kvkk" className="hover:text-indigo-400 transition">Privacy Policy</Link>
+            <span className="mt-2 block text-slate-400">
+              Developed &amp; Powered by <a href="https://www.ainengroup.com" target="_blank" rel="noopener noreferrer" className="font-semibold text-indigo-400 hover:text-indigo-300 transition">AINEN Group Bilişim A.Ş.</a>
+            </span>
+          </div>
+        </div>
+      </footer>
     </main>
   );
 }
@@ -680,7 +758,7 @@ export default function OrderPage() {
     <Suspense fallback={
       <main className="min-h-screen bg-slate-950 text-white">
         <div className="flex min-h-[60vh] items-center justify-center">
-          <div className="text-slate-300">Yükleniyor...</div>
+          <div className="text-slate-300">Loading...</div>
         </div>
       </main>
     }>

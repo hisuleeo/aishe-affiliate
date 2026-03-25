@@ -2,48 +2,59 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 
-interface AuditLog {
+interface ActionLog {
   id: string;
-  actorId: string | null;
+  userId: string | null;
   action: string;
+  entityType: string;
+  entityId: string | null;
   metadata: any;
+  ipAddress: string | null;
+  userAgent: string | null;
   createdAt: string;
-  actor: {
+  user: {
     id: string;
     email: string;
     name: string | null;
+    roles: { role: string }[];
   } | null;
 }
 
 interface LogsResponse {
-  logs: AuditLog[];
-  total: number;
-  limit: number;
-  offset: number;
+  data: ActionLog[];
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
 }
 
+const actionColors: Record<string, string> = {
+  'user.registered': 'bg-green-500 text-white',
+  'user.logged_in': 'bg-blue-500 text-white',
+  'order.created': 'bg-purple-500 text-white',
+  'payout.approved': 'bg-green-600 text-white',
+  'payout.rejected': 'bg-red-500 text-white',
+  'support.ticket_created': 'bg-yellow-500 text-white',
+  'support.ticket_closed': 'bg-gray-500 text-white',
+};
+
 export function LogViewer() {
-  const [selectedAction, setSelectedAction] = useState<string>('all');
+  const [filters, setFilters] = useState({ action: '', entityType: '' });
   const [page, setPage] = useState(1);
   const limit = 50;
 
-  const { data: actions = [] } = useQuery({
-    queryKey: ['admin', 'log-actions'],
-    queryFn: async () => {
-      const response = await apiClient.get<string[]>('/admin/system/logs/actions');
-      return response.data;
-    },
-  });
-
   const { data, isLoading } = useQuery({
-    queryKey: ['admin', 'logs', selectedAction, page],
+    queryKey: ['admin', 'action-logs', filters, page],
     queryFn: async () => {
-      const offset = (page - 1) * limit;
-      const url =
-        selectedAction === 'all'
-          ? `/admin/system/logs?limit=${limit}&offset=${offset}`
-          : `/admin/system/logs?action=${selectedAction}&limit=${limit}&offset=${offset}`;
-      const response = await apiClient.get<LogsResponse>(url);
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+        ...(filters.action && { action: filters.action }),
+        ...(filters.entityType && { entityType: filters.entityType }),
+      });
+      const response = await apiClient.get<LogsResponse>(`/admin/action-logs?${params}`);
       return response.data;
     },
   });
@@ -60,8 +71,6 @@ export function LogViewer() {
     }).format(date);
   };
 
-  const totalPages = data ? Math.ceil(data.total / limit) : 1;
-
   if (isLoading && !data) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -76,7 +85,7 @@ export function LogViewer() {
         <div>
           <h2 className="text-2xl font-bold">Sistem Logları</h2>
           <p className="text-muted-foreground">
-            {data?.total || 0} toplam log kaydı
+            {data?.pagination.total || 0} toplam log kaydı
           </p>
         </div>
       </div>
@@ -87,19 +96,35 @@ export function LogViewer() {
         </label>
         <select
           id="action-filter"
-          value={selectedAction}
+          value={filters.action}
           onChange={(e) => {
-            setSelectedAction(e.target.value);
+            setFilters({ ...filters, action: e.target.value });
             setPage(1);
           }}
           className="rounded border px-3 py-2"
         >
-          <option value="all">Tümü</option>
-          {actions.map((action) => (
-            <option key={action} value={action}>
-              {action}
-            </option>
-          ))}
+          <option value="">Tümü</option>
+          <option value="user.registered">user.registered</option>
+          <option value="user.logged_in">user.logged_in</option>
+          <option value="order.created">order.created</option>
+        </select>
+
+        <label htmlFor="entity-filter" className="font-medium ml-4">
+          Entity:
+        </label>
+        <select
+          id="entity-filter"
+          value={filters.entityType}
+          onChange={(e) => {
+            setFilters({ ...filters, entityType: e.target.value });
+            setPage(1);
+          }}
+          className="rounded border px-3 py-2"
+        >
+          <option value="">Tümü</option>
+          <option value="User">User</option>
+          <option value="Order">Order</option>
+          <option value="SupportTicket">SupportTicket</option>
         </select>
       </div>
 
@@ -111,36 +136,48 @@ export function LogViewer() {
                 <th className="p-4 text-left font-medium">Zaman</th>
                 <th className="p-4 text-left font-medium">Aksiyon</th>
                 <th className="p-4 text-left font-medium">Kullanıcı</th>
+                <th className="p-4 text-left font-medium">Entity</th>
                 <th className="p-4 text-left font-medium">Metadata</th>
+                <th className="p-4 text-left font-medium">IP</th>
               </tr>
             </thead>
             <tbody>
-              {data?.logs.length === 0 ? (
+              {data?.data.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="p-8 text-center text-muted-foreground">
+                  <td colSpan={6} className="p-8 text-center text-muted-foreground">
                     Log bulunamadı
                   </td>
                 </tr>
               ) : (
-                data?.logs.map((log) => (
+                data?.data.map((log) => (
                   <tr key={log.id} className="border-b last:border-0 hover:bg-muted/20">
-                    <td className="p-4 text-sm">{formatDate(log.createdAt)}</td>
+                    <td className="p-4 text-sm font-mono">{formatDate(log.createdAt)}</td>
                     <td className="p-4">
-                      <span className="inline-flex rounded-full bg-primary/10 px-2 py-1 text-xs font-medium">
+                      <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${actionColors[log.action] || 'bg-gray-500 text-white'}`}>
                         {log.action}
                       </span>
                     </td>
                     <td className="p-4">
-                      {log.actor ? (
+                      {log.user ? (
                         <div>
-                          <div className="font-medium">{log.actor.name || 'N/A'}</div>
+                          <div className="font-medium">{log.user.name || log.user.email}</div>
                           <div className="text-xs text-muted-foreground">
-                            {log.actor.email}
+                            {log.user.email}
                           </div>
                         </div>
                       ) : (
-                        <span className="text-muted-foreground">System</span>
+                        <span className="text-muted-foreground">Sistem</span>
                       )}
+                    </td>
+                    <td className="p-4">
+                      <div className="font-mono text-xs">
+                        <div className="font-semibold">{log.entityType}</div>
+                        {log.entityId && (
+                          <div className="text-muted-foreground truncate max-w-[120px]">
+                            {log.entityId}
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td className="p-4">
                       {log.metadata ? (
@@ -156,6 +193,7 @@ export function LogViewer() {
                         <span className="text-muted-foreground">-</span>
                       )}
                     </td>
+                    <td className="p-4 font-mono text-xs">{log.ipAddress || '-'}</td>
                   </tr>
                 ))
               )}
@@ -164,7 +202,7 @@ export function LogViewer() {
         </div>
       </div>
 
-      {totalPages > 1 && (
+      {data && data.pagination.totalPages > 1 && (
         <div className="flex items-center justify-center gap-2">
           <button
             onClick={() => setPage((p) => Math.max(1, p - 1))}
@@ -174,11 +212,11 @@ export function LogViewer() {
             Önceki
           </button>
           <span className="text-sm text-muted-foreground">
-            Sayfa {page} / {totalPages}
+            Sayfa {page} / {data.pagination.totalPages}
           </span>
           <button
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages}
+            onClick={() => setPage((p) => Math.min(data.pagination.totalPages, p + 1))}
+            disabled={page === data.pagination.totalPages}
             className="rounded bg-secondary px-4 py-2 disabled:opacity-50"
           >
             Sonraki

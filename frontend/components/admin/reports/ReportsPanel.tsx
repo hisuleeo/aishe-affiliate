@@ -7,6 +7,7 @@ interface ReportOverview {
     totalUsers: number;
     totalOrders: number;
     totalRevenue: string;
+    currency: string;
   };
 }
 
@@ -28,11 +29,11 @@ export function ReportsPanel() {
     },
   });
 
-  const formatCurrency = (amount: string | number) => {
+  const formatCurrency = (amount: string | number, currency: string = 'USD') => {
     const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-    return new Intl.NumberFormat('tr-TR', {
+    return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'TRY',
+      currency: currency,
       maximumFractionDigits: 2,
     }).format(num);
   };
@@ -120,7 +121,7 @@ export function ReportsPanel() {
             Toplam Gelir
           </div>
           <div className="mt-2 text-3xl font-bold">
-            {data ? formatCurrency(data.summary.totalRevenue) : '₺0'}
+            {data ? formatCurrency(data.summary.totalRevenue, data.summary.currency) : '$0'}
           </div>
         </div>
       </div>

@@ -30,3 +30,8 @@ export const getReferralStats = async () => {
   }>('/users/me/referral-stats');
   return response.data;
 };
+
+export const getReferralRewards = async () => {
+  const response = await apiClient.get('/api/v1/referral/rewards');
+  return response.data;
+};

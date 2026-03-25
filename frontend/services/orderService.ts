@@ -9,6 +9,7 @@ export const getOrders = async () => {
 export type CreateOrderPayload = {
   packageId: string;
   affiliateId?: string;
+  affiliateCode?: string;
   referralCode?: string;
   aisheId?: string;
   selectedOptions?: string[];

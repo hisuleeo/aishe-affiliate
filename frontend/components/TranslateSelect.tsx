@@ -10,8 +10,8 @@ type LanguageOption = {
 };
 
 const LANGUAGE_OPTIONS: LanguageOption[] = [
-  { code: 'tr', label: 'Türkçe', short: 'TR', flag: '🇹🇷' },
   { code: 'en', label: 'English', short: 'EN', flag: '🇬🇧' },
+  { code: 'tr', label: 'Türkçe', short: 'TR', flag: '🇹🇷' },
   { code: 'de', label: 'Deutsch', short: 'DE', flag: '🇩🇪' },
   { code: 'fr', label: 'Français', short: 'FR', flag: '🇫🇷' },
   { code: 'es', label: 'Español', short: 'ES', flag: '🇪🇸' },
@@ -25,7 +25,7 @@ const LANGUAGE_OPTIONS: LanguageOption[] = [
   { code: 'hi', label: 'हिन्दी', short: 'HI', flag: '🇮🇳' },
 ];
 
-const SOURCE_LANGUAGE = 'tr';
+const SOURCE_LANGUAGE = 'en';
 
 function getGoogTransLang(): string {
   if (typeof document === 'undefined') return SOURCE_LANGUAGE;
@@ -75,13 +75,13 @@ export default function TranslateSelect() {
     const lang = event.target.value;
     setSelected(lang);
 
-    // Türkçe'ye dönüyorsa cookie'yi temizle
+    // İngilizce'ye (varsayılan dil) dönüyorsa cookie'yi temizle
     if (lang === SOURCE_LANGUAGE) {
       clearGoogTransCookies();
       // Google Translate frame'ini kaldır
       const frame = document.querySelector('.goog-te-banner-frame');
       if (frame) (frame as HTMLElement).style.display = 'none';
-      // Sayfayı reload et (temiz Türkçe)
+      // Sayfayı reload et (temiz İngilizce)
       window.location.reload();
       return;
     }

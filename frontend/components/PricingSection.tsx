@@ -29,9 +29,9 @@ const customFeatureOptions: CustomFeature[] = [
   { id: 'wave', label: 'Wave' },
 ];
 
-const FEATURE_PRICE = 10; // Her checkbox +10€
-const BASE_PRICE = 25;    // Base fiyat 25€
-const LIMIT_PER_UNIT = 50; // Her 1.0 GB = 50€
+const FEATURE_PRICE = 25; // Her checkbox +25$
+const BASE_PRICE = 25;    // Base fiyat 25$
+const LIMIT_PER_UNIT = 50; // Her 1.0 GB = 50$
 
 const defaultSelected = ['reca', 'statea', 'aisp', 'wevents'];
 
@@ -89,7 +89,7 @@ export default function PricingSection() {
             <div className="text-center">
               <h3 className="text-xl font-semibold text-white">Custom</h3>
               <p className="mt-2 text-3xl font-bold text-sky-200">
-                {formatCurrency(totalPrice, 'EUR')}
+                {formatCurrency(totalPrice, 'USD')}
               </p>
               <p className="text-xs text-slate-400">/ Aylık</p>
             </div>
@@ -113,7 +113,7 @@ export default function PricingSection() {
                         className="h-4 w-4 accent-indigo-500"
                       />
                       <span className="flex-1">{feature.label}</span>
-                      <span className="text-xs text-slate-400">+€10,00</span>
+                      <span className="text-xs text-slate-400">+$25.00</span>
                     </label>
                   </li>
                 ))}

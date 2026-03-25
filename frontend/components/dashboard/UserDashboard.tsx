@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import type { Order, Package, PackageOption } from '@shared/types';
-import { createOrder, getOrders } from '@/services/orderService';
+import { useQuery, useQueries, useQueryClient } from '@tanstack/react-query';
+import type { Order, Package } from '@shared/types';
+import { getOrders } from '@/services/orderService';
 import { getPackages } from '@/services/packageService';
 import {
   createAffiliateLink,
@@ -17,10 +17,22 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { StatCard } from '@/components/ui/StatCard';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { useAuth } from '@/components/auth/useAuth';
-import { User } from 'lucide-react';
+import {
+  User,
+  Package as PackageIcon,
+  Clock,
+  ShoppingBag,
+  TrendingUp,
+  Copy,
+  Check,
+  ExternalLink,
+  Gift,
+  Zap,
+  ArrowRight,
+} from 'lucide-react';
 import { UserTickets } from '@/components/user/support/UserTickets';
 
-const formatCurrency = (amount: string, currency: string) => {
+const formatCurrency = (amount: string | number, currency: string) => {
   const value = Number(amount);
   return new Intl.NumberFormat('tr-TR', {
     style: 'currency',
@@ -29,60 +41,130 @@ const formatCurrency = (amount: string, currency: string) => {
   }).format(Number.isNaN(value) ? 0 : value);
 };
 
+const formatDate = (value: string) =>
+  new Date(value).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
+
+const formatDateTime = (value: string | null) =>
+  value ? new Date(value).toLocaleString('tr-TR') : '—';
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const { showToast } = useToast();
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    showToast({ title: 'Kopyalandı', variant: 'success' });
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      className="flex items-center gap-1.5 rounded-lg border border-indigo-500/40 bg-indigo-500/10 px-3 py-1.5 text-xs font-semibold text-indigo-300 transition hover:border-indigo-400/60 hover:bg-indigo-500/20"
+    >
+      {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+      {copied ? 'Kopyalandı' : 'Kopyala'}
+    </button>
+  );
+}
+
+function SkeletonRow() {
+  return (
+    <div className="flex items-center justify-between px-4 py-3">
+      <div className="space-y-2">
+        <div className="h-3.5 w-32 animate-pulse rounded bg-slate-800" />
+        <div className="h-2.5 w-20 animate-pulse rounded bg-slate-800/70" />
+      </div>
+      <div className="h-3.5 w-16 animate-pulse rounded bg-slate-800" />
+    </div>
+  );
+}
+
 export default function UserDashboard() {
   const queryClient = useQueryClient();
-  const { isAuthenticated } = useAuth();
-  const { data: orders, isLoading: ordersLoading, isError: ordersError } = useQuery<Order[]>({
+  const { isAuthenticated, user } = useAuth();
+  const { showToast } = useToast();
+
+  const { data: orders, isLoading: ordersLoading } = useQuery<Order[]>({
     queryKey: ['orders'],
     queryFn: getOrders,
     enabled: isAuthenticated,
   });
-  const {
-    data: packages,
-    isLoading: packagesLoading,
-    isError: packagesError,
-  } = useQuery<Package[]>({
+  const { data: packages, isLoading: packagesLoading } = useQuery<Package[]>({
     queryKey: ['packages'],
     queryFn: getPackages,
     enabled: isAuthenticated,
   });
-  const { data: referral, isError: referralError } = useQuery({
+  const { data: referral } = useQuery({
     queryKey: ['referral-code'],
     queryFn: getReferralCode,
     enabled: isAuthenticated,
   });
-  const { data: affiliateLinks, isLoading: affiliateLoading, isError: affiliateErrorState } = useQuery({
+  const { data: affiliateLinks, isLoading: affiliateLoading } = useQuery({
     queryKey: ['affiliate-links'],
     queryFn: getAffiliateLinks,
     enabled: isAuthenticated,
   });
-  const { showToast } = useToast();
+
+  // Affiliate link metrikleri useQueries ile (proper React Query caching)
+  const metricsQueries = useQueries({
+    queries: (affiliateLinks ?? []).map((link) => ({
+      queryKey: ['affiliate-link-metrics', link.id],
+      queryFn: () => getAffiliateLinkMetrics(link.id),
+      enabled: isAuthenticated && !!link.id,
+      staleTime: 60_000,
+    })),
+  });
+
+  const affiliateMetrics = useMemo(() => {
+    const map: Record<string, { totalClicks: number; uniqueCookies: number; lastClickedAt: string | null }> = {};
+    (affiliateLinks ?? []).forEach((link, i) => {
+      const data = metricsQueries[i]?.data;
+      if (data) {
+        map[link.id] = {
+          totalClicks: data.totals.totalClicks,
+          uniqueCookies: data.totals.uniqueCookies,
+          lastClickedAt: data.totals.lastClickedAt,
+        };
+      }
+    });
+    return map;
+  }, [affiliateLinks, metricsQueries]);
+
   const [affiliateTargetUrl, setAffiliateTargetUrl] = useState('');
   const [affiliateError, setAffiliateError] = useState<string | null>(null);
   const [isCreatingAffiliate, setIsCreatingAffiliate] = useState(false);
-  const [affiliateMetrics, setAffiliateMetrics] = useState<Record<string, {
-    totalClicks: number;
-    uniqueCookies: number;
-    lastClickedAt: string | null;
-  }>>({});
   const affiliateInputRef = useRef<HTMLInputElement | null>(null);
+
   const latestOrders = useMemo(() => (orders ?? []).slice(0, 5), [orders]);
-  const totalSpend = useMemo(() => {
-    return (orders ?? []).reduce((sum, order) => sum + Number(order.amount), 0);
-  }, [orders]);
-  const isMetricsLoading = ordersLoading || packagesLoading;
+  const activeOrder = latestOrders[0] ?? null;
+
+  const totalSpend = useMemo(
+    () => (orders ?? []).reduce((sum, o) => sum + Number(o.amount), 0),
+    [orders],
+  );
+
+  const primaryCurrency = orders?.[0]?.currency ?? 'EUR';
+
+  const packageMap = useMemo(
+    () => new Map((packages ?? []).map((pkg) => [pkg.id, pkg])),
+    [packages],
+  );
+
   const spendTrend = useMemo(() => {
     const items = orders ?? [];
     if (items.length < 2) return null;
     const sorted = [...items].slice(0, 10);
-    const recent = sorted.slice(0, 5).reduce((sum, order) => sum + Number(order.amount), 0);
-    const previous = sorted.slice(5, 10).reduce((sum, order) => sum + Number(order.amount), 0);
+    const recent = sorted.slice(0, 5).reduce((sum, o) => sum + Number(o.amount), 0);
+    const previous = sorted.slice(5, 10).reduce((sum, o) => sum + Number(o.amount), 0);
     if (previous === 0) return null;
     return Math.round(((recent - previous) / previous) * 100);
   }, [orders]);
 
   const renderTrendChip = (trend: number | null) => {
-    if (trend === null) return 'Son 5 siparişin toplamı.';
+    if (trend === null) return 'Toplam harcama.';
     const isPositive = trend >= 0;
     return (
       <span className={`inline-flex items-center gap-1 ${isPositive ? 'text-emerald-300' : 'text-rose-300'}`}>
@@ -99,80 +181,26 @@ export default function UserDashboard() {
     );
   };
 
-  const primaryCurrency = orders?.[0]?.currency ?? 'EUR';
-  const packageMap = useMemo(
-    () => new Map((packages ?? []).map((pkg) => [pkg.id, pkg.name])),
-    [packages],
-  );
+  const greeting = useMemo(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Günaydın';
+    if (hour < 18) return 'İyi günler';
+    return 'İyi akşamlar';
+  }, []);
 
-  useEffect(() => {
-    if (ordersError) {
-      showToast({ title: 'Siparişler yüklenemedi', variant: 'error' });
-    }
-  }, [ordersError, showToast]);
-
-  useEffect(() => {
-    if (packagesError) {
-      showToast({ title: 'Paketler yüklenemedi', variant: 'error' });
-    }
-  }, [packagesError, showToast]);
-
-  useEffect(() => {
-    if (referralError) {
-      showToast({ title: 'Referral kodu alınamadı', variant: 'error' });
-    }
-  }, [referralError, showToast]);
-
-  useEffect(() => {
-    if (affiliateErrorState) {
-      showToast({ title: 'Affiliate linkler yüklenemedi', variant: 'error' });
-    }
-  }, [affiliateErrorState, showToast]);
-
-  useEffect(() => {
-    if (!affiliateLinks || affiliateLinks.length === 0) {
-      setAffiliateMetrics({});
-      return;
-    }
-
-    let isMounted = true;
-    Promise.all(
-      affiliateLinks.map(async (link) => {
-        const metrics = await getAffiliateLinkMetrics(link.id);
-        return [
-          link.id,
-          {
-            totalClicks: metrics.totals.totalClicks,
-            uniqueCookies: metrics.totals.uniqueCookies,
-            lastClickedAt: metrics.totals.lastClickedAt,
-          },
-        ] as const;
-      }),
-    )
-      .then((entries) => {
-        if (!isMounted) return;
-        setAffiliateMetrics(Object.fromEntries(entries));
-      })
-      .catch(() => {
-        if (!isMounted) return;
-        setAffiliateMetrics({});
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [affiliateLinks]);
-
-  const formatDateTime = (value: string | null) =>
-    value ? new Date(value).toLocaleString('tr-TR') : '—';
+  const displayName = user?.name?.split(' ')[0] ?? user?.email?.split('@')[0] ?? 'Kullanıcı';
 
   return (
-    <section className="space-y-10 rounded-2xl border border-slate-800 bg-slate-900/60 p-8 shadow-lg">
-      <div className="flex flex-wrap items-center justify-between gap-4">
+    <section className="space-y-6 sm:space-y-8 rounded-2xl border border-slate-800 bg-slate-900/60 p-4 sm:p-6 lg:p-8 shadow-lg">
+
+      {/* Header — Selamlama */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Dashboard</p>
-          <h1 className="mt-2 text-2xl font-semibold">Kullanıcı Paneli</h1>
-          <p className="mt-2 text-sm text-slate-300">
+          <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Kullanıcı Paneli</p>
+          <h1 className="mt-2 text-2xl font-semibold">
+            {greeting}, <span className="text-indigo-300">{displayName}</span> 👋
+          </h1>
+          <p className="mt-1 text-sm text-slate-400">
             Siparişlerini, paketlerini ve avantajlarını tek ekranda yönet.
           </p>
         </div>
@@ -184,16 +212,10 @@ export default function UserDashboard() {
             <User className="h-4 w-4" />
             Profilim
           </Link>
-          <button
-            type="button"
-            className="rounded-full border border-slate-700 bg-slate-950/40 px-4 py-2 text-xs font-semibold text-slate-200"
-          >
-            Raporu Görüntüle
-          </button>
           <Link
             href="/order"
             className={`rounded-full border border-indigo-500/60 bg-indigo-500/10 px-4 py-2 text-xs font-semibold text-indigo-200 transition ${
-              packagesLoading ? 'pointer-events-none opacity-60' : 'hover:border-indigo-400'
+              packagesLoading ? 'pointer-events-none opacity-60' : 'hover:border-indigo-400 hover:bg-indigo-500/20'
             }`}
           >
             Yeni Paket Keşfet
@@ -201,81 +223,66 @@ export default function UserDashboard() {
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-4">
+      {/* Stat Kartları */}
+      <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
         <StatCard
           title="Toplam Harcama"
           highlight
-          value={ordersLoading ? '—' : formatCurrency(String(totalSpend), primaryCurrency)}
+          value={ordersLoading ? '—' : formatCurrency(totalSpend, primaryCurrency)}
           subtitle={renderTrendChip(spendTrend)}
         />
         <StatCard
           title="Sipariş Sayısı"
-          value={ordersLoading ? '—' : orders?.length ?? 0}
-          subtitle="Son hareketlerini takip et."
+          value={ordersLoading ? '—' : (orders?.length ?? 0)}
+          subtitle="Tüm siparişlerin."
         />
         <StatCard
           title="Aktif Paket"
-          value={isMetricsLoading ? '—' : latestOrders[0]?.packageId 
-            ? (packageMap.get(latestOrders[0].packageId) ?? '—')
-            : '—'}
-          subtitle="Yenileme için hazır."
+          value={
+            ordersLoading || packagesLoading
+              ? '—'
+              : activeOrder
+              ? (packageMap.get(activeOrder.packageId)?.name ?? '—')
+              : 'Yok'
+          }
+          subtitle={
+            activeOrder?.validUntil
+              ? `Geçerlilik: ${formatDate(activeOrder.validUntil)}`
+              : 'Henüz paket yok.'
+          }
         />
         <StatCard
-          title="Affiliate Alanı"
-          value={affiliateLoading ? '—' : affiliateLinks?.length ?? 0}
+          title="Affiliate Linkler"
+          value={affiliateLoading ? '—' : (affiliateLinks?.length ?? 0)}
           subtitle={
-            affiliateLoading ? (
-              'Yükleniyor...'
-            ) : (affiliateLinks?.length ?? 0) === 0 ? (
-              <div className="flex flex-col gap-2">
-                <span className="text-xs text-slate-400">Paylaş, kazanmaya başla.</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!referral?.code) return;
-                    navigator.clipboard.writeText(referral.code);
-                    showToast({ title: 'Referral kodu kopyalandı', variant: 'success' });
-                  }}
-                  disabled={!referral?.code}
-                  className="inline-flex items-center gap-2 rounded-full border border-slate-700 px-3 py-1 text-xs font-semibold text-slate-200 disabled:opacity-50"
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                    className="h-3.5 w-3.5"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M8 7.5V6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2h-1.5"
-                    />
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M6 9h6a2 2 0 012 2v6a2 2 0 01-2 2H6a2 2 0 01-2-2v-6a2 2 0 012-2z"
-                    />
-                  </svg>
-                  Kopyala
-                </button>
-              </div>
-            ) : (
-              'Paylaşım performansı.'
-            )
+            (affiliateLinks?.length ?? 0) > 0
+              ? 'Paylaşım performansı.'
+              : 'İlk linkinizi oluşturun.'
           }
         />
       </div>
 
+      {/* Son Siparişler + Aktif Paket */}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+
+        {/* Sol: Son Siparişler */}
         <div className="rounded-2xl border border-slate-800 bg-slate-950/30 p-6 shadow-inner shadow-slate-950/40">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Son Siparişler</h2>
-            <span className="text-xs text-slate-400">{ordersLoading ? 'Yükleniyor...' : 'Güncel'}</span>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-base font-semibold flex items-center gap-2">
+              <ShoppingBag className="h-4 w-4 text-indigo-400" />
+              Son Siparişler
+            </h2>
+            <Link
+              href="/profile"
+              className="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1 transition"
+            >
+              Tümü <ArrowRight className="h-3 w-3" />
+            </Link>
           </div>
-          <div className="mt-4 divide-y divide-slate-800/60 rounded-xl border border-slate-800/70 bg-slate-950/40">
-            {latestOrders.length === 0 ? (
+          <div className="divide-y divide-slate-800/60 rounded-xl border border-slate-800/70 bg-slate-950/40">
+            {ordersLoading ? (
+              Array.from({ length: 3 }).map((_, i) => <SkeletonRow key={i} />)
+            ) : latestOrders.length === 0 ? (
               <div className="p-4">
                 <EmptyState
                   title="Henüz sipariş yok"
@@ -284,16 +291,16 @@ export default function UserDashboard() {
               </div>
             ) : (
               latestOrders.map((order) => (
-                <div key={order.id} className="flex items-center justify-between px-4 py-3 text-sm">
-                  <div>
-                    <p className="font-semibold text-slate-100">
-                      {packageMap.get(order.packageId) ?? order.packageId}
+                <div key={order.id} className="flex items-center justify-between gap-2 px-4 py-3 text-sm">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-slate-100 truncate">
+                      {packageMap.get(order.packageId)?.name ?? order.packageId?.slice(0, 8) ?? '—'}
                     </p>
                     <p className="text-xs text-slate-400">
                       {new Date(order.createdAt).toLocaleDateString('tr-TR')}
                     </p>
                   </div>
-                  <div className="text-right">
+                  <div className="flex shrink-0 items-center gap-2 sm:gap-3">
                     <p className="font-semibold text-white">
                       {formatCurrency(order.amount, order.currency)}
                     </p>
@@ -305,158 +312,202 @@ export default function UserDashboard() {
           </div>
         </div>
 
+        {/* Sağ: Aktif Paket */}
         <div className="rounded-2xl border border-slate-800 bg-slate-950/30 p-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Aktif Paketim</h2>
-            <span className="text-xs text-slate-400">
-              {ordersLoading ? 'Yükleniyor...' : latestOrders.length > 0 ? 'Aktif' : 'Yok'}
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-base font-semibold flex items-center gap-2">
+              <PackageIcon className="h-4 w-4 text-indigo-400" />
+              Aktif Paketim
+            </h2>
+            <span className={`text-xs font-semibold ${activeOrder ? 'text-emerald-400' : 'text-slate-500'}`}>
+              {ordersLoading ? 'Yükleniyor...' : activeOrder ? 'Aktif' : 'Yok'}
             </span>
           </div>
-          <div className="mt-4">
-            {latestOrders.length === 0 ? (
-              <EmptyState
-                title="Aktif paket yok"
-                description="Henüz bir paket satın almadınız."
-              />
-            ) : (
-              (() => {
-                const activeOrder = latestOrders[0];
-                const pkg = (packages ?? []).find((p) => p.id === activeOrder.packageId);
-                return (
-                  <div className="rounded-[28px] border border-slate-800/70 bg-gradient-to-br from-slate-950 via-slate-950/80 to-indigo-500/10 p-5 shadow-[0_20px_50px_-40px_rgba(99,102,241,0.6)]">
-                    <div className="text-center">
-                      <p className="text-sm font-semibold text-white">{pkg?.name ?? 'Paket'}</p>
-                      <p className="mt-2 text-2xl font-bold text-sky-200">
-                        {formatCurrency(activeOrder.amount, activeOrder.currency)}
-                      </p>
-                      <p className="text-[11px] text-slate-400">
-                        {new Date(activeOrder.createdAt).toLocaleDateString('tr-TR')}
-                      </p>
-                    </div>
 
-                    {pkg?.description && (
-                      <p className="mt-4 text-xs text-slate-400">{pkg.description}</p>
-                    )}
-
-                    {activeOrder.aisheId && (
-                      <div className="mt-4 rounded-xl border border-slate-800/70 bg-slate-950/60 p-3">
-                        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                          Kullanılan AISHE ID
-                        </p>
-                        <p className="mt-1 text-sm font-mono font-semibold text-indigo-300">
-                          {activeOrder.aisheId}
-                        </p>
-                      </div>
-                    )}
-
-                    <div className="mt-4 flex items-center justify-center gap-2 rounded-lg bg-slate-950/40 px-3 py-2">
-                      <StatusBadge status={activeOrder.status} />
-                    </div>
-                  </div>
-                );
-              })()
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded-2xl border border-slate-800 bg-slate-950/30 p-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Aktivite Akışı</h2>
-          <span className="text-xs text-slate-400">Son hareketler</span>
-        </div>
-        <div className="mt-4 space-y-4">
           {ordersLoading ? (
-            <EmptyState title="Aktivite yükleniyor" />
-          ) : latestOrders.length === 0 ? (
-            <EmptyState title="Henüz aktivite kaydı yok" />
-          ) : (
-            latestOrders.map((order) => (
-              <div key={order.id} className="flex items-center gap-4">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full border border-indigo-500/50 bg-indigo-500/10 text-xs text-indigo-200">
-                  {order.status.slice(0, 1).toUpperCase()}
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-slate-100">
-                    {packageMap.get(order.packageId) ?? 'Paket'} siparişi {order.status}
+            <div className="space-y-3">
+              <div className="h-5 w-3/4 animate-pulse rounded bg-slate-800" />
+              <div className="h-8 w-1/2 animate-pulse rounded bg-slate-800" />
+              <div className="h-3 w-full animate-pulse rounded bg-slate-800/60" />
+            </div>
+          ) : !activeOrder ? (
+            <EmptyState
+              title="Aktif paket yok"
+              description="Bir paket satın alarak başlayın."
+              actionLabel="Paket Keşfet"
+              onAction={() => { window.location.href = '/order'; }}
+            />
+          ) : (() => {
+            const pkg = packageMap.get(activeOrder.packageId);
+            return (
+              <div className="rounded-[24px] border border-slate-800/70 bg-gradient-to-br from-slate-950 via-slate-950/80 to-indigo-500/10 p-5 shadow-[0_20px_50px_-40px_rgba(99,102,241,0.6)]">
+                <div className="text-center">
+                  <p className="text-sm font-semibold text-white">{pkg?.name ?? 'Paket'}</p>
+                  <p className="mt-2 text-2xl font-bold text-sky-200">
+                    {formatCurrency(activeOrder.amount, activeOrder.currency)}
                   </p>
-                  <p className="text-xs text-slate-400">
-                    {new Date(order.createdAt).toLocaleString('tr-TR')}
-                  </p>
+                  {activeOrder.validUntil && (
+                    <p className="mt-1 text-[11px] text-slate-400 flex items-center justify-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {formatDate(activeOrder.validUntil)}&apos;e kadar geçerli
+                    </p>
+                  )}
                 </div>
-                <span className="text-xs font-semibold text-slate-200">
-                  {formatCurrency(order.amount, order.currency)}
-                </span>
+
+                {activeOrder.aisheId && (
+                  <div className="mt-4 rounded-xl border border-slate-800/70 bg-slate-950/60 p-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                      AISHE ID
+                    </p>
+                    <p className="mt-1 text-sm font-mono font-semibold text-indigo-300">
+                      {activeOrder.aisheId}
+                    </p>
+                  </div>
+                )}
+
+                <div className="mt-4 flex items-center justify-between gap-2">
+                  <StatusBadge status={activeOrder.status} />
+                  <Link
+                    href="/profile?tab=extensions"
+                    className="rounded-lg border border-indigo-500/50 bg-indigo-500/10 px-3 py-1.5 text-xs font-semibold text-indigo-300 transition hover:bg-indigo-500/20 flex items-center gap-1.5"
+                  >
+                    <Clock className="h-3.5 w-3.5" />
+                    Uzat
+                  </Link>
+                </div>
               </div>
-            ))
-          )}
+            );
+          })()}
         </div>
       </div>
 
-      {/* Destek Talepleri Bölümü */}
+      {/* Hızlı Erişim */}
+      <div className="rounded-2xl border border-slate-800 bg-slate-950/30 p-6">
+        <h2 className="mb-4 text-base font-semibold flex items-center gap-2">
+          <Zap className="h-4 w-4 text-yellow-400" />
+          Hızlı Erişim
+        </h2>
+        <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
+          <Link
+            href="/profile?tab=orders"
+            className="flex items-center gap-3 rounded-xl border border-slate-800/80 bg-slate-950/40 p-4 text-sm font-semibold text-slate-200 transition hover:border-indigo-500/40 hover:bg-indigo-500/5"
+          >
+            <ShoppingBag className="h-5 w-5 text-indigo-400 shrink-0" />
+            <span>Tüm Siparişler</span>
+            <ArrowRight className="ml-auto h-4 w-4 text-slate-500" />
+          </Link>
+          <Link
+            href="/profile?tab=extensions"
+            className="flex items-center gap-3 rounded-xl border border-slate-800/80 bg-slate-950/40 p-4 text-sm font-semibold text-slate-200 transition hover:border-indigo-500/40 hover:bg-indigo-500/5"
+          >
+            <Clock className="h-5 w-5 text-indigo-400 shrink-0" />
+            <span>Paket Uzat</span>
+            <ArrowRight className="ml-auto h-4 w-4 text-slate-500" />
+          </Link>
+          <Link
+            href="/profile?tab=affiliate"
+            className="flex items-center gap-3 rounded-xl border border-slate-800/80 bg-slate-950/40 p-4 text-sm font-semibold text-slate-200 transition hover:border-indigo-500/40 hover:bg-indigo-500/5"
+          >
+            <TrendingUp className="h-5 w-5 text-indigo-400 shrink-0" />
+            <span>Affiliate Kazanç</span>
+            <ArrowRight className="ml-auto h-4 w-4 text-slate-500" />
+          </Link>
+          <Link
+            href="/profile?tab=referral"
+            className="flex items-center gap-3 rounded-xl border border-slate-800/80 bg-slate-950/40 p-4 text-sm font-semibold text-slate-200 transition hover:border-indigo-500/40 hover:bg-indigo-500/5"
+          >
+            <Gift className="h-5 w-5 text-indigo-400 shrink-0" />
+            <span>Referral Ödüller</span>
+            <ArrowRight className="ml-auto h-4 w-4 text-slate-500" />
+          </Link>
+        </div>
+      </div>
+
+      {/* Destek Talepleri */}
       <div className="rounded-2xl border border-slate-800 bg-slate-950/30 p-6">
         <UserTickets />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+      {/* Referral Kodu + Affiliate Linkler */}
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+
+        {/* Referral Kodu */}
         <div className="rounded-2xl border border-slate-800 bg-slate-950/30 p-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Referral Kodum</h2>
-            <span className="text-xs text-slate-400">Kişisel kod</span>
-          </div>
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-800/70 bg-slate-950/40 px-4 py-4">
-            <div>
-              <p className="text-xs text-slate-400">Kod</p>
-              <p className="text-xl font-semibold text-white">{referral?.code ?? '—'}</p>
-              <p className="mt-1 text-xs text-slate-500">
-                Bu kodu paylaşarak ödül kazanabilirsiniz.
-              </p>
+          <h2 className="mb-4 text-base font-semibold flex items-center gap-2">
+            <Gift className="h-4 w-4 text-emerald-400" />
+            Referral Kodum
+          </h2>
+          <div className="rounded-xl border border-slate-800/70 bg-slate-950/40 p-4">
+            <p className="text-xs text-slate-500">Kişisel kodun</p>
+            <p className="mt-1 text-2xl font-bold tracking-widest text-white">
+              {referral?.code ?? '—'}
+            </p>
+            <p className="mt-2 text-xs text-slate-500">
+              Bu kodu arkadaşlarınla paylaş, her siparişlerinden ödül kazan.
+            </p>
+            <div className="mt-3">
+              {referral?.code ? (
+                <CopyButton text={referral.code} />
+              ) : (
+                <div className="h-8 w-20 animate-pulse rounded-lg bg-slate-800" />
+              )}
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                if (!referral?.code) return;
-                navigator.clipboard.writeText(referral.code);
-                showToast({ title: 'Kod kopyalandı', variant: 'success' });
-              }}
-              disabled={!referral?.code}
-              className="rounded-lg border border-indigo-500/60 px-4 py-2 text-xs font-semibold text-indigo-200"
-            >
-              Kopyala
-            </button>
           </div>
         </div>
 
+        {/* Affiliate Linkler */}
         <div className="rounded-2xl border border-slate-800 bg-slate-950/30 p-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Affiliate Linkler</h2>
-            <span className="text-xs text-slate-400">{affiliateLinks?.length ?? 0} link</span>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-base font-semibold flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-indigo-400" />
+              Affiliate Linkler
+            </h2>
+            <span className="text-xs text-slate-500">{affiliateLinks?.length ?? 0} link</span>
           </div>
-          <div className="mt-4 space-y-3">
+
+          <div className="space-y-3 mb-4">
             {affiliateLoading ? (
-              <EmptyState title="Affiliate linkler yükleniyor" />
+              Array.from({ length: 2 }).map((_, i) => (
+                <div key={i} className="rounded-xl border border-slate-800/70 bg-slate-950/40 p-4 space-y-2">
+                  <div className="h-3.5 w-1/3 animate-pulse rounded bg-slate-800" />
+                  <div className="h-2.5 w-2/3 animate-pulse rounded bg-slate-800/70" />
+                </div>
+              ))
             ) : affiliateLinks && affiliateLinks.length > 0 ? (
               affiliateLinks.slice(0, 3).map((link) => {
                 const metrics = affiliateMetrics[link.id];
                 return (
                   <div key={link.id} className="rounded-xl border border-slate-800/70 bg-slate-950/40 p-4 text-sm">
-                    <p className="font-semibold text-slate-100">{link.code}</p>
-                    <p className="mt-1 text-xs text-slate-400">{link.targetUrl}</p>
-                    <div className="mt-3 grid gap-2 text-xs text-slate-400 md:grid-cols-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-semibold text-slate-100">{link.code}</p>
+                      <div className="flex items-center gap-1.5">
+                        <CopyButton text={`${link.targetUrl}?ref=${link.code}`} />
+                        <a
+                          href={link.targetUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 rounded-lg border border-slate-700 px-2 py-1.5 text-xs text-slate-400 transition hover:text-slate-200"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      </div>
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500 truncate">{link.targetUrl}</p>
+                    <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
                       <div className="rounded-lg border border-slate-800/80 bg-slate-950/60 px-3 py-2">
-                        <p className="text-[10px] uppercase tracking-[0.2em]">Tıklama</p>
-                        <p className="mt-1 text-sm font-semibold text-slate-100">
+                        <p className="text-[10px] uppercase tracking-[0.15em] text-slate-500">Tıklama</p>
+                        <p className="mt-1 font-semibold text-slate-100">
                           {metrics ? metrics.totalClicks : '—'}
                         </p>
                       </div>
                       <div className="rounded-lg border border-slate-800/80 bg-slate-950/60 px-3 py-2">
-                        <p className="text-[10px] uppercase tracking-[0.2em]">Tekil</p>
-                        <p className="mt-1 text-sm font-semibold text-slate-100">
+                        <p className="text-[10px] uppercase tracking-[0.15em] text-slate-500">Tekil</p>
+                        <p className="mt-1 font-semibold text-slate-100">
                           {metrics ? metrics.uniqueCookies : '—'}
                         </p>
                       </div>
                       <div className="rounded-lg border border-slate-800/80 bg-slate-950/60 px-3 py-2">
-                        <p className="text-[10px] uppercase tracking-[0.2em]">Son tıklama</p>
+                        <p className="text-[10px] uppercase tracking-[0.15em] text-slate-500">Son tıklama</p>
                         <p className="mt-1 text-[11px] font-semibold text-slate-100">
                           {metrics ? formatDateTime(metrics.lastClickedAt) : '—'}
                         </p>
@@ -474,96 +525,57 @@ export default function UserDashboard() {
               />
             )}
           </div>
-          <div className="mt-4 space-y-2">
-            <label className="text-xs font-semibold text-slate-300">Hedef URL</label>
+
+          {/* Yeni link oluşturma formu */}
+          <div className="space-y-2 pt-3 border-t border-slate-800/60">
+            <label className="text-xs font-semibold text-slate-400">Hedef URL</label>
             <input
               ref={affiliateInputRef}
               value={affiliateTargetUrl}
-              onChange={(event) => {
-                setAffiliateTargetUrl(event.target.value);
+              onChange={(e) => {
+                setAffiliateTargetUrl(e.target.value);
                 if (affiliateError) setAffiliateError(null);
               }}
               placeholder="https://aishe.app"
-              className="w-full rounded-lg border border-slate-800 bg-slate-950/50 px-3 py-2 text-sm text-slate-100 outline-none focus:border-indigo-500"
+              className="w-full rounded-lg border border-slate-800 bg-slate-950/50 px-3 py-2.5 text-base text-slate-100 outline-none focus:border-indigo-500 transition min-h-[44px]"
             />
             {affiliateError ? (
               <p className="text-xs text-rose-300">{affiliateError}</p>
             ) : (
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-slate-600">
                 Kampanya veya landing sayfanızın linkini ekleyin.
               </p>
             )}
+            <button
+              type="button"
+              disabled={isCreatingAffiliate}
+              onClick={async () => {
+                const trimmed = affiliateTargetUrl.trim();
+                if (!trimmed) {
+                  setAffiliateError('Lütfen geçerli bir URL girin.');
+                  return;
+                }
+                try { new URL(trimmed); } catch {
+                  setAffiliateError('Lütfen http/https içeren bir URL girin.');
+                  return;
+                }
+                setIsCreatingAffiliate(true);
+                try {
+                  await createAffiliateLink({ targetUrl: trimmed });
+                  await queryClient.invalidateQueries({ queryKey: ['affiliate-links'] });
+                  showToast({ title: 'Affiliate link oluşturuldu', variant: 'success' });
+                  setAffiliateTargetUrl('');
+                } catch {
+                  showToast({ title: 'Affiliate link oluşturulamadı', variant: 'error' });
+                } finally {
+                  setIsCreatingAffiliate(false);
+                }
+              }}
+              className="w-full rounded-lg border border-indigo-500/60 bg-indigo-500/10 px-4 py-2.5 text-xs font-semibold text-indigo-200 transition hover:bg-indigo-500/20 disabled:opacity-50 min-h-[44px]"
+            >
+              {isCreatingAffiliate ? 'Oluşturuluyor...' : '+ Yeni Affiliate Link Oluştur'}
+            </button>
           </div>
-          <button
-            type="button"
-            disabled={isCreatingAffiliate}
-            onClick={async () => {
-              const trimmedUrl = affiliateTargetUrl.trim();
-              if (!trimmedUrl) {
-                setAffiliateError('Lütfen geçerli bir URL girin.');
-                showToast({ title: 'Hedef URL boş olamaz', variant: 'error' });
-                return;
-              }
-              try {
-                new URL(trimmedUrl);
-              } catch {
-                setAffiliateError('Lütfen http/https içeren bir URL girin.');
-                showToast({ title: 'Geçersiz URL', variant: 'error' });
-                return;
-              }
-
-              setIsCreatingAffiliate(true);
-              try {
-                await createAffiliateLink({ targetUrl: trimmedUrl });
-                await queryClient.invalidateQueries({ queryKey: ['affiliate-links'] });
-                showToast({ title: 'Affiliate link oluşturuldu', variant: 'success' });
-                setAffiliateTargetUrl('');
-              } catch {
-                showToast({
-                  title: 'Affiliate link oluşturulamadı',
-                  description: 'Lütfen daha sonra tekrar deneyin.',
-                  variant: 'error',
-                });
-              } finally {
-                setIsCreatingAffiliate(false);
-              }
-            }}
-            className="mt-4 w-full rounded-lg border border-indigo-500/60 px-4 py-2 text-xs font-semibold text-indigo-200 disabled:opacity-60"
-          >
-            {isCreatingAffiliate ? 'Oluşturuluyor...' : 'Yeni Affiliate Link Oluştur'}
-          </button>
-        </div>
-      </div>
-
-      <div className="rounded-2xl border border-slate-800 bg-slate-950/30 p-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-semibold">Paket Süresini Uzat</h2>
-            <p className="mt-1 text-sm text-slate-400">
-              Mevcut paketini 1 ay uzatarak kesintisiz kullanmaya devam et.
-            </p>
-          </div>
-          <button
-            type="button"
-            disabled={!latestOrders[0]}
-            onClick={async () => {
-              const activeOrder = latestOrders[0];
-              if (!activeOrder) return;
-              try {
-                await createOrder({ packageId: activeOrder.packageId });
-                showToast({ title: 'Uzatma siparişi oluşturuldu', variant: 'success' });
-              } catch {
-                showToast({
-                  title: 'Uzatma işlemi başarısız',
-                  description: 'Lütfen tekrar deneyin.',
-                  variant: 'error',
-                });
-              }
-            }}
-            className="rounded-lg border border-indigo-500/60 px-4 py-2 text-xs font-semibold text-indigo-200 disabled:opacity-50"
-          >
-            1 Ay Uzat
-          </button>
         </div>
       </div>
     </section>

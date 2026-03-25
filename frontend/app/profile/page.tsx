@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import type { ExtensionRequest as ExtensionRequestType } from '@shared/types';
+import type { ExtensionRequest as ExtensionRequestType, AffiliateCommission, ReferralReward } from '@shared/types';
 import { useAuth } from '@/components/auth/useAuth';
 import { useToast } from '@/components/ui/ToastProvider';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -15,7 +15,9 @@ import { getOrders } from '@/services/orderService';
 import { getPackages } from '@/services/packageService';
 import { getProfile, updateProfile } from '@/services/profileService';
 import { getExtensionRequests, createExtensionRequest } from '@/services/extensionService';
-import { getReferralStats } from '@/services/referralService';
+import { getReferralStats, getReferralRewards } from '@/services/referralService';
+import { getAffiliateStats, getAffiliateCommissions } from '@/services/affiliateService';
+import { getAffiliateLinks } from '@/services/referralService';
 import { 
   User, 
   Package, 
@@ -46,59 +48,65 @@ import {
 } from 'lucide-react';
 
 const tabs = [
-  { 
-    key: 'profile', 
-    label: 'Profil Bilgilerim',
+  {
+    key: 'profile',
+    label: 'Profilim',
     icon: User,
-    description: 'Kişisel bilgilerinizi yönetin'
+    description: 'Kişisel bilgilerini yönet'
   },
-  { 
-    key: 'packages', 
+  {
+    key: 'packages',
     label: 'AISHE Paketlerim',
     icon: Package,
-    description: 'Aktif paketlerinizi görüntüleyin'
+    description: 'Aktif paketlerini görüntüle'
   },
-  { 
-    key: 'extensions', 
-    label: 'Uzatma Taleplerim',
+  {
+    key: 'extensions',
+    label: 'Uzatma Talepleri',
     icon: Clock,
-    description: 'Paket süre uzatma taleplerini yönetin'
+    description: 'Paket uzatma taleplerini yönet'
   },
-  { 
-    key: 'orders', 
+  {
+    key: 'orders',
     label: 'Siparişlerim',
     icon: ShoppingBag,
-    description: 'Sipariş geçmişinizi inceleyin'
+    description: 'Sipariş geçmişini görüntüle'
   },
-  { 
-    key: 'affiliate', 
-    label: 'Affiliate Program',
+  {
+    key: 'affiliate',
+    label: 'Affiliate Programı',
     icon: TrendingUp,
-    description: 'Komisyon kazançlarınızı görün'
+    description: 'Komisyon kazançlarını görüntüle'
   },
-  { 
-    key: 'referral', 
-    label: 'Referans Program',
+  {
+    key: 'referral',
+    label: 'Referral Programı',
     icon: Users,
-    description: 'Arkadaşlarınızı davet edin'
+    description: 'Arkadaşlarını davet et'
   },
-  { 
-    key: 'support', 
+  {
+    key: 'support',
     label: 'Destek',
     icon: MessageCircle,
-    description: 'Yardım ve destek alın'
+    description: 'Yardım ve destek al'
   },
 ];
 
 const formatDate = (value: string) => new Date(value).toLocaleDateString('tr-TR');
 
-export default function ProfilePage() {
+function ProfilePageContent() {
   const router = useRouter();
-  const { isAuthenticated, isLoading, user, updateUser } = useAuth();
+  const searchParams = useSearchParams();
+  const { isAuthenticated, isLoading, user, updateUser, logout } = useAuth();
   const { showToast } = useToast();
-  const [activeTab, setActiveTab] = useState('profile');
+  const [activeTab, setActiveTab] = useState(() => {
+    const tabParam = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('tab') : null;
+    const valid = ['profile', 'packages', 'extensions', 'orders', 'affiliate', 'referral', 'support'];
+    return valid.includes(tabParam ?? '') ? (tabParam as string) : 'profile';
+  });
   const queryClient = useQueryClient();
   const [isMounted, setIsMounted] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [username, setUsername] = useState('');
@@ -133,6 +141,38 @@ export default function ProfilePage() {
     queryKey: ['referral-stats'],
     queryFn: getReferralStats,
     enabled: isAuthenticated && isMounted,
+    retry: 1,
+    staleTime: 30000,
+  });
+
+  const { data: affiliateStats } = useQuery({
+    queryKey: ['affiliate-stats'],
+    queryFn: getAffiliateStats,
+    enabled: isAuthenticated && isMounted,
+    retry: 1,
+    staleTime: 30000,
+  });
+
+  const { data: affiliateCommissions = [] } = useQuery({
+    queryKey: ['affiliate-commissions'],
+    queryFn: getAffiliateCommissions,
+    enabled: isAuthenticated && isMounted,
+    retry: 1,
+    staleTime: 30000,
+  });
+
+  const { data: referralRewards = [] } = useQuery({
+    queryKey: ['referral-rewards'],
+    queryFn: getReferralRewards,
+    enabled: isAuthenticated && isMounted,
+    retry: 1,
+    staleTime: 30000,
+  });
+
+  const { data: affiliateLinks = [] } = useQuery({
+    queryKey: ['affiliate-links'],
+    queryFn: getAffiliateLinks,
+    enabled: isAuthenticated && isMounted,
   });
 
   const packageOptions = useMemo(() => packages ?? [], [packages]);
@@ -146,6 +186,14 @@ export default function ProfilePage() {
       router.replace('/login');
     }
   }, [isAuthenticated, isLoading, router]);
+
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    const valid = ['profile', 'packages', 'extensions', 'orders', 'affiliate', 'referral', 'support'];
+    if (tab && valid.includes(tab)) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     const nameSource = profile?.name ?? user?.name ?? '';
@@ -166,7 +214,7 @@ export default function ProfilePage() {
     if (normalizedUsername && !/^[a-z0-9_]+$/i.test(normalizedUsername)) {
       showToast({
         title: 'Geçersiz kullanıcı adı',
-        description: 'Kullanıcı adı sadece harf, rakam ve alt çizgi içerebilir.',
+        description: 'Sadece harf, rakam ve alt çizgi kullanabilirsiniz.',
         variant: 'error',
       });
       setIsSaving(false);
@@ -180,11 +228,14 @@ export default function ProfilePage() {
         username: normalizedUsername || undefined,
       });
       updateUser({ name: updated.name ?? fullName, email: updated.email, id: updated.id });
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      queryClient.invalidateQueries({ queryKey: ['affiliate-links'] });
+      queryClient.invalidateQueries({ queryKey: ['referral-code'] });
       showToast({ title: 'Profil güncellendi', variant: 'success' });
     } catch {
       showToast({
         title: 'Profil güncellenemedi',
-        description: 'Lütfen bilgileri kontrol edip tekrar deneyin.',
+        description: 'Bilgileri kontrol edip tekrar deneyin.',
         variant: 'error',
       });
     } finally {
@@ -226,29 +277,46 @@ export default function ProfilePage() {
     <main className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white">
       {/* Top Header */}
       <header className="sticky top-0 z-50 border-b border-white/5 bg-slate-950/80 backdrop-blur-xl">
-        <div className="mx-auto flex w-full max-w-[1920px] items-center justify-between gap-4 px-6 py-4">
-          <div className="flex items-center gap-4">
-            <Image
-              src="/brand/aishelogo.png"
-              alt="AISHE"
-              width={120}
-              height={40}
-              className="h-9 w-auto object-contain"
-              priority
-            />
+        <div className="mx-auto flex w-full max-w-[1920px] items-center justify-between gap-4 px-4 sm:px-6 py-3 sm:py-4">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <Link href="/">
+              <Image
+                src="/brand/aishelogo.png"
+                alt="AISHE"
+                width={120}
+                height={40}
+                className="h-8 sm:h-9 w-auto object-contain"
+                priority
+              />
+            </Link>
             <div className="hidden md:block">
               <div className="h-6 w-px bg-gradient-to-b from-transparent via-slate-700 to-transparent" />
             </div>
             <div className="hidden md:block">
-              <p className="text-sm font-medium text-white">{profile?.name || user?.name || 'Kullanıcı'}</p>
+              <p className="text-sm font-medium text-white">{profile?.name || user?.name || 'User'}</p>
               <p className="text-xs text-slate-400">{user?.email}</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Aktif badge: hidden on mobile */}
             <div className="hidden lg:flex items-center gap-2 px-4 py-2 rounded-lg bg-green-500/10 border border-green-500/20">
               <div className="h-2 w-2 rounded-full bg-green-400 animate-pulse" />
               <span className="text-xs font-semibold text-green-400">Aktif</span>
             </div>
+            {/* Panel link: hidden on mobile */}
+            <Link
+              href="/dashboard"
+              className="hidden sm:inline-flex rounded-full border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:border-slate-500 items-center min-h-[36px]"
+            >
+              Panel
+            </Link>
+            <button
+              type="button"
+              onClick={() => { logout(); router.replace('/login'); }}
+              className="rounded-full border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:border-slate-500 inline-flex items-center min-h-[36px]"
+            >
+              Çıkış
+            </button>
           </div>
         </div>
       </header>
@@ -306,22 +374,22 @@ export default function ProfilePage() {
 
           {/* Sidebar Footer */}
           <div className="border-t border-white/5 p-6 space-y-2">
-            <Link 
-              href="/" 
+            <Link
+              href="/"
               className="flex items-center gap-3 rounded-lg px-4 py-2 text-sm font-medium text-slate-300 transition-all hover:bg-white/5 hover:text-white"
             >
               <Home className="h-4 w-4" />
               Ana Sayfa
             </Link>
-            <Link 
-              href="/dashboard" 
+            <Link
+              href="/dashboard"
               className="flex items-center gap-3 rounded-lg px-4 py-2 text-sm font-medium text-slate-300 transition-all hover:bg-white/5 hover:text-white"
             >
               <LayoutDashboard className="h-4 w-4" />
-              Dashboard
+              Panel
             </Link>
-            <Link 
-              href="/order" 
+            <Link
+              href="/order"
               className="flex items-center gap-3 rounded-lg px-4 py-2 text-sm font-medium text-slate-300 transition-all hover:bg-white/5 hover:text-white"
             >
               <ShoppingCart className="h-4 w-4" />
@@ -331,67 +399,102 @@ export default function ProfilePage() {
         </aside>
 
         {/* Main Content */}
-        <section className="flex-1 mx-auto w-full max-w-7xl px-6 py-10">
-          {/* Mobile Tab Navigation */}
-          <div className="lg:hidden mb-8 overflow-x-auto -mx-2 px-2">
-            <div className="flex gap-2 min-w-max">
-              {tabs.map((tab) => {
-                const Icon = tab.icon;
-                return (
+        <section className="flex-1 mx-auto w-full max-w-7xl px-4 sm:px-6 py-4 sm:py-8 lg:py-10">
+          {/* Mobile Tab Navigation — Dropdown */}
+          <div className="lg:hidden mb-4 sm:mb-6 relative">
+            {(() => {
+              const activeTabData = tabs.find((t) => t.key === activeTab) ?? tabs[0];
+              const ActiveIcon = activeTabData.icon;
+              return (
+                <>
                   <button
-                    key={tab.key}
                     type="button"
-                    onClick={() => setActiveTab(tab.key)}
-                    className={`group relative flex items-center gap-3 rounded-2xl px-6 py-4 text-left transition-all duration-300 ${
-                      activeTab === tab.key
-                        ? 'bg-gradient-to-br from-indigo-500/20 to-purple-500/10 shadow-xl shadow-indigo-500/10 border border-indigo-500/30'
-                        : 'bg-white/5 hover:bg-white/10 border border-transparent hover:border-white/10'
-                    }`}
+                    onClick={() => setIsMobileMenuOpen((prev) => !prev)}
+                    className="flex w-full items-center justify-between gap-3 rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-3.5 text-left backdrop-blur-sm transition-all hover:border-white/20 min-h-[52px]"
                   >
-                    <Icon className={`h-6 w-6 transition-colors ${
-                      activeTab === tab.key ? 'text-indigo-400' : 'text-slate-400 group-hover:text-slate-300'
-                    }`} />
-                    <div className="flex-1">
-                      <p className={`text-sm font-semibold transition-colors ${
-                        activeTab === tab.key ? 'text-white' : 'text-slate-300 group-hover:text-white'
-                      }`}>
-                        {tab.label}
-                      </p>
-                      <p className={`text-xs transition-colors ${
-                        activeTab === tab.key ? 'text-slate-400' : 'text-slate-500 group-hover:text-slate-400'
-                      }`}>
-                        {tab.description}
-                      </p>
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-500/20 border border-indigo-500/30">
+                        <ActiveIcon className="h-4 w-4 text-indigo-400" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-white">{activeTabData.label}</p>
+                        <p className="text-xs text-slate-400">{activeTabData.description}</p>
+                      </div>
                     </div>
+                    <svg
+                      className={`h-5 w-5 shrink-0 text-slate-400 transition-transform duration-200 ${isMobileMenuOpen ? 'rotate-180' : ''}`}
+                      viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
+                    </svg>
                   </button>
-                );
-              })}
-            </div>
+
+                  {isMobileMenuOpen && (
+                    <div className="absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-2xl border border-white/10 bg-slate-900/95 shadow-2xl shadow-black/40 backdrop-blur-xl">
+                      {tabs.map((tab) => {
+                        const Icon = tab.icon;
+                        const isActive = activeTab === tab.key;
+                        return (
+                          <button
+                            key={tab.key}
+                            type="button"
+                            onClick={() => {
+                              setActiveTab(tab.key);
+                              setIsMobileMenuOpen(false);
+                            }}
+                            className={`flex w-full items-center gap-3 px-4 py-3.5 text-left transition-all ${
+                              isActive
+                                ? 'bg-indigo-500/15 border-l-2 border-indigo-400'
+                                : 'border-l-2 border-transparent hover:bg-white/5'
+                            }`}
+                          >
+                            <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition-colors ${
+                              isActive ? 'bg-indigo-500/20 border border-indigo-500/30' : 'bg-white/5 border border-white/10'
+                            }`}>
+                              <Icon className={`h-4 w-4 ${isActive ? 'text-indigo-400' : 'text-slate-400'}`} />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className={`text-sm font-semibold ${isActive ? 'text-white' : 'text-slate-300'}`}>{tab.label}</p>
+                              <p className="text-xs text-slate-500 truncate">{tab.description}</p>
+                            </div>
+                            {isActive && (
+                              <svg className="h-4 w-4 shrink-0 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
 
           {/* Content Area */}
-          <div className="rounded-3xl border border-white/5 bg-slate-900/40 backdrop-blur-sm p-8 shadow-2xl">
+          <div className="rounded-2xl sm:rounded-3xl border border-white/5 bg-slate-900/40 backdrop-blur-sm p-4 sm:p-8 shadow-2xl">
             {activeTab === 'profile' ? (
-              <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-slate-800/40 to-slate-900/40 p-8 backdrop-blur-sm">
+              <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-slate-800/40 to-slate-900/40 p-4 sm:p-8 backdrop-blur-sm">
                 <div className="mb-6">
                   <h2 className="text-xl font-bold text-white flex items-center gap-2">
                     <Sparkles className="h-5 w-5 text-indigo-400" />
-                    Profil Bilgileriniz
+                    Profil Bilgilerim
                   </h2>
                   <p className="mt-1 text-sm text-slate-400">Kişisel bilgilerinizi güncelleyin</p>
                 </div>
                 
-                <div className="grid gap-6 md:grid-cols-3">
+                <div className="grid gap-4 sm:gap-6 sm:grid-cols-2 md:grid-cols-3">
                   <div>
                     <label className="text-xs font-medium text-slate-300 flex items-center gap-1">
                       <User className="h-3.5 w-3.5" />
                       Ad
                     </label>
                     <input
-                      className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-indigo-500/50 focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                      className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-base text-white placeholder:text-slate-500 focus:border-indigo-500/50 focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all min-h-[44px]"
                       value={firstName}
                       onChange={(event) => setFirstName(event.target.value)}
-                      placeholder="Adınız"
+                      placeholder="Adınızı girin"
                     />
                   </div>
                   <div>
@@ -400,10 +503,10 @@ export default function ProfilePage() {
                       Soyad
                     </label>
                     <input
-                      className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-indigo-500/50 focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                      className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-base text-white placeholder:text-slate-500 focus:border-indigo-500/50 focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all min-h-[44px]"
                       value={lastName}
                       onChange={(event) => setLastName(event.target.value)}
-                      placeholder="Soyadınız"
+                      placeholder="Soyadınızı girin"
                     />
                   </div>
                   <div>
@@ -412,7 +515,7 @@ export default function ProfilePage() {
                       E-posta
                     </label>
                     <input
-                      className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-400 cursor-not-allowed"
+                      className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-base text-slate-400 cursor-not-allowed min-h-[44px]"
                       value={profile?.email ?? user?.email ?? ''}
                       readOnly
                     />
@@ -426,10 +529,10 @@ export default function ProfilePage() {
                       Kullanıcı Adı
                     </label>
                     <input
-                      className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-indigo-500/50 focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                      className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-base text-white placeholder:text-slate-500 focus:border-indigo-500/50 focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all min-h-[44px]"
                       value={username}
                       onChange={(event) => setUsername(event.target.value)}
-                      placeholder="kullanici_adi"
+                      placeholder="kullaniciadi"
                     />
                     <p className="mt-2 text-xs text-slate-500">Sadece harf, rakam ve alt çizgi kullanabilirsiniz</p>
                   </div>
@@ -451,7 +554,7 @@ export default function ProfilePage() {
                           </>
                         ) : (
                           <>
-                            💾 Değişiklikleri Kaydet
+                            Kaydet
                           </>
                         )}
                       </span>
@@ -463,7 +566,7 @@ export default function ProfilePage() {
             ) : null}
 
             {activeTab === 'packages' ? (
-              <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-slate-800/40 to-slate-900/40 p-8 backdrop-blur-sm">
+              <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-slate-800/40 to-slate-900/40 p-4 sm:p-8 backdrop-blur-sm">
                 <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
                   <div>
                     <h2 className="text-xl font-bold text-white flex items-center gap-2">
@@ -534,21 +637,21 @@ export default function ProfilePage() {
                               className="rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-5 py-2.5 text-xs font-semibold text-indigo-300 transition-all hover:bg-indigo-500/20 hover:border-indigo-500/50 hover:scale-105 flex items-center gap-1.5"
                             >
                               <Clock className="h-3.5 w-3.5" />
-                              Süre Uzat
+                              Uzat
                             </button>
                             <button
                               type="button"
-                              onClick={() => showToast({ title: 'Detay yakında', variant: 'success' })}
+                              onClick={() => showToast({ title: 'Detaylar yakında', variant: 'success' })}
                               className="rounded-xl border border-white/10 bg-white/5 px-5 py-2.5 text-xs font-semibold text-slate-300 transition-all hover:bg-white/10 hover:border-white/20"
                             >
-                              📋 Detay
+                              Detaylar
                             </button>
                             <button
                               type="button"
-                              onClick={() => showToast({ title: 'Paket durduruldu', variant: 'success' })}
+                              onClick={() => showToast({ title: 'Paket askıya alındı', variant: 'success' })}
                               className="rounded-full border border-rose-500/60 px-4 py-2 text-xs font-semibold text-rose-200"
                             >
-                              Durdur
+                              Askıya Al
                             </button>
                           </div>
                         </div>
@@ -560,13 +663,13 @@ export default function ProfilePage() {
             ) : null}
 
             {activeTab === 'extensions' ? (
-              <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-slate-800/40 to-slate-900/40 p-8 backdrop-blur-sm">
+              <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-slate-800/40 to-slate-900/40 p-4 sm:p-8 backdrop-blur-sm">
                 <div className="mb-6">
                   <h2 className="text-xl font-bold text-white flex items-center gap-2">
                     <Clock className="h-5 w-5 text-indigo-400" />
-                    Uzatma Taleplerim
+                    Uzatma Talepleri
                   </h2>
-                  <p className="mt-1 text-sm text-slate-400">Paket süre uzatma isteklerinizi yönetin ve takip edin</p>
+                  <p className="mt-1 text-sm text-slate-400">Paket uzatma taleplerinizi yönetin ve takip edin</p>
                 </div>
                 
                 <div className="mb-8 rounded-xl border border-white/10 bg-gradient-to-br from-indigo-500/10 to-purple-500/5 p-6">
@@ -574,7 +677,7 @@ export default function ProfilePage() {
                     <AlertCircle className="h-4 w-4 text-indigo-400" />
                     Yeni Uzatma Talebi Oluştur
                   </h3>
-                  <div className="grid gap-4 md:grid-cols-[2fr_auto]">
+                  <div className="grid gap-4 sm:grid-cols-[2fr_auto]">
                     <div>
                       <label className="text-xs font-medium text-slate-300 flex items-center gap-1 mb-2">
                         <ShoppingBag className="h-3.5 w-3.5" />
@@ -583,14 +686,14 @@ export default function ProfilePage() {
                       <select
                         value={selectedOrderId}
                         onChange={(event) => setSelectedOrderId(event.target.value)}
-                        className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:border-indigo-500/50 focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                        className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-base text-white focus:border-indigo-500/50 focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all min-h-[44px]"
                       >
                         <option value="" className="bg-slate-900">Sipariş seçin</option>
                         {(orders ?? []).map((order) => {
                           const pkg = packageOptions.find(p => p.id === order.packageId);
                           return (
                             <option key={order.id} value={order.id} className="bg-slate-900">
-                              {pkg?.name ?? 'Paket'} - {formatDate(order.createdAt)}
+                              {pkg?.name ?? 'Package'} - {formatDate(order.createdAt)}
                             </option>
                           );
                         })}
@@ -622,33 +725,33 @@ export default function ProfilePage() {
                     <div className="text-center py-12">
                       <Clock className="h-16 w-16 mx-auto mb-4 text-slate-600" />
                       <p className="text-lg font-semibold text-white">Henüz uzatma talebi yok</p>
-                      <p className="mt-2 text-sm text-slate-400">Yeni bir talep oluşturduğunda burada görünecek</p>
+                      <p className="mt-2 text-sm text-slate-400">Talep oluşturduğunuzda burada görünecek</p>
                     </div>
                   ) : (
                     extensionRequests.map((request) => {
                       const pkg = request.order?.package;
                       const statusConfig: Record<string, {icon: any; label: string; color: string; glow: string}> = {
-                        pending: { 
-                          icon: AlertCircle, 
-                          label: 'Ödeme Bekliyor', 
+                        pending: {
+                          icon: AlertCircle,
+                          label: 'Ödeme Bekleniyor',
                           color: 'border-yellow-500/30 bg-yellow-500/10 text-yellow-300',
                           glow: 'shadow-yellow-500/10'
                         },
-                        paid: { 
-                          icon: CheckCircle2, 
-                          label: 'Ödendi', 
+                        paid: {
+                          icon: CheckCircle2,
+                          label: 'Ödendi',
                           color: 'border-green-500/30 bg-green-500/10 text-green-300',
                           glow: 'shadow-green-500/10'
                         },
-                        failed: { 
-                          icon: XCircle, 
-                          label: 'Başarısız', 
+                        failed: {
+                          icon: XCircle,
+                          label: 'Başarısız',
                           color: 'border-red-500/30 bg-red-500/10 text-red-300',
                           glow: 'shadow-red-500/10'
                         },
-                        canceled: { 
-                          icon: XCircle, 
-                          label: 'İptal Edildi', 
+                        canceled: {
+                          icon: XCircle,
+                          label: 'İptal Edildi',
                           color: 'border-slate-700 bg-slate-800/30 text-slate-400',
                           glow: 'shadow-slate-500/10'
                         }
@@ -670,10 +773,10 @@ export default function ProfilePage() {
                                 </div>
                                 <div>
                                   <h3 className="text-base font-bold text-white">
-                                    {pkg?.name ?? 'Paket'}
+                                    {pkg?.name ?? 'Package'}
                                   </h3>
                                   <p className="text-xs text-slate-500">
-                                    Sipariş #{request.orderId.slice(0, 8)}...
+                                    Sipariş #{request.orderId?.slice(0, 8) ?? '—'}...
                                   </p>
                                 </div>
                               </div>
@@ -708,7 +811,7 @@ export default function ProfilePage() {
             ) : null}
 
             {activeTab === 'orders' ? (
-              <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-slate-800/40 to-slate-900/40 p-8 backdrop-blur-sm">
+              <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-slate-800/40 to-slate-900/40 p-4 sm:p-8 backdrop-blur-sm">
                 <div className="flex items-center justify-between mb-6">
                   <div>
                     <h2 className="text-xl font-bold text-white flex items-center gap-2">
@@ -730,7 +833,7 @@ export default function ProfilePage() {
                     <div className="text-center py-12">
                       <ShoppingBag className="h-16 w-16 mx-auto mb-4 text-slate-600" />
                       <p className="text-lg font-semibold text-white">Henüz sipariş yok</p>
-                      <p className="mt-2 text-sm text-slate-400">İlk siparişinizi oluşturarak başlayın</p>
+                      <p className="mt-2 text-sm text-slate-400">İlk siparişinizi vererek başlayın</p>
                     </div>
                   ) : (
                     (orders ?? []).map((order) => (
@@ -745,7 +848,7 @@ export default function ProfilePage() {
                               <Package className="h-6 w-6 text-indigo-400" />
                             </div>
                             <div>
-                              <p className="text-sm font-bold text-white">Sipariş #{order.id.slice(0, 8)}...</p>
+                              <p className="text-sm font-bold text-white">Sipariş #{order.id?.slice(0, 8) ?? '—'}...</p>
                               <div className="mt-1 flex items-center gap-3">
                                 <span className="text-xs text-slate-400 flex items-center gap-1">
                                   <Calendar className="h-3 w-3" />
@@ -776,7 +879,7 @@ export default function ProfilePage() {
             ) : null}
 
             {activeTab === 'support' ? (
-              <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-slate-800/40 to-slate-900/40 p-8 backdrop-blur-sm">
+              <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-slate-800/40 to-slate-900/40 p-4 sm:p-8 backdrop-blur-sm">
                 <div className="mb-6">
                   <h2 className="text-xl font-bold text-white flex items-center gap-2">
                     <MessageCircle className="h-5 w-5 text-indigo-400" />
@@ -790,32 +893,32 @@ export default function ProfilePage() {
             ) : null}
 
             {activeTab === 'affiliate' ? (
-              <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-slate-800/40 to-slate-900/40 p-8 backdrop-blur-sm">
+              <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-slate-800/40 to-slate-900/40 p-4 sm:p-8 backdrop-blur-sm">
                 <div className="mb-6">
                   <h2 className="text-xl font-bold text-white flex items-center gap-2">
                     <TrendingUp className="h-5 w-5 text-indigo-400" />
-                    Affiliate Program
+                    Affiliate Programı
                   </h2>
-                  <p className="mt-1 text-sm text-slate-400">Bağlantılarınız üzerinden satış yapın, komisyon kazanın</p>
+                  <p className="mt-1 text-sm text-slate-400">Linklerinle satış yap, komisyon kazan</p>
                 </div>
 
                 {/* Stats Grid */}
-                <div className="grid gap-4 md:grid-cols-3 mb-8">
+                <div className="grid gap-4 grid-cols-1 sm:grid-cols-3 mb-6 sm:mb-8">
                   <div className="rounded-xl border border-white/10 bg-gradient-to-br from-indigo-500/10 to-purple-500/5 p-6">
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-xs font-medium text-slate-400">Toplam Tıklama</p>
                       <TrendingUp className="h-4 w-4 text-indigo-400" />
                     </div>
-                    <p className="text-2xl font-bold text-white">0</p>
-                    <p className="text-xs text-slate-500 mt-1">Bağlantı tıklama sayısı</p>
+                    <p className="text-2xl font-bold text-white">{affiliateStats?.totalClicks ?? 0}</p>
+                    <p className="text-xs text-slate-500 mt-1">Link tıklama sayısı</p>
                   </div>
 
                   <div className="rounded-xl border border-white/10 bg-gradient-to-br from-green-500/10 to-emerald-500/5 p-6">
                     <div className="flex items-center justify-between mb-2">
-                      <p className="text-xs font-medium text-slate-400">Dönüşüm</p>
+                      <p className="text-xs font-medium text-slate-400">Dönüşümler</p>
                       <CheckCircle2 className="h-4 w-4 text-green-400" />
                     </div>
-                    <p className="text-2xl font-bold text-white">0</p>
+                    <p className="text-2xl font-bold text-white">{affiliateStats?.totalConversions ?? 0}</p>
                     <p className="text-xs text-slate-500 mt-1">Başarılı satış sayısı</p>
                   </div>
 
@@ -824,7 +927,7 @@ export default function ProfilePage() {
                       <p className="text-xs font-medium text-slate-400">Toplam Kazanç</p>
                       <DollarSign className="h-4 w-4 text-yellow-400" />
                     </div>
-                    <p className="text-2xl font-bold text-white">€0.00</p>
+                    <p className="text-2xl font-bold text-white">€{affiliateStats?.totalEarnings ?? '0.00'}</p>
                     <p className="text-xs text-slate-500 mt-1">Tüm komisyon geliri</p>
                   </div>
                 </div>
@@ -833,27 +936,33 @@ export default function ProfilePage() {
                 <div className="mb-8 rounded-xl border border-white/10 bg-gradient-to-br from-indigo-500/10 to-purple-500/5 p-6">
                   <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
                     <LinkIcon className="h-4 w-4 text-indigo-400" />
-                    Affiliate Bağlantınız
+                    Affiliate Linkiniz
                   </h3>
-                  <div className="flex gap-3">
-                    <input
-                      type="text"
-                      readOnly
-                      value="https://aishe.com/ref/YOUR_CODE"
-                      className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-400 cursor-not-allowed"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText('https://aishe.com/ref/YOUR_CODE');
-                        showToast({ title: 'Bağlantı kopyalandı!', variant: 'success' });
-                      }}
-                      className="rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition-all hover:shadow-xl hover:shadow-indigo-500/40 hover:scale-105"
-                    >
-                      Kopyala
-                    </button>
-                  </div>
-                  <p className="mt-3 text-xs text-slate-500">Bu bağlantı ile yapılan satışlardan %10 komisyon kazanırsınız</p>
+                  {affiliateLinks.length > 0 ? (
+                    <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
+                      <input
+                        type="text"
+                        readOnly
+                        value={affiliateLinks[0].targetUrl}
+                        className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-base text-white font-mono overflow-x-auto min-h-[44px]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(affiliateLinks[0].targetUrl);
+                          showToast({ title: 'Link kopyalandı', variant: 'success' });
+                        }}
+                        className="rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition-all hover:shadow-xl hover:shadow-indigo-500/40 hover:scale-105 min-h-[44px] whitespace-nowrap"
+                      >
+                        Kopyala
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="text-center py-4">
+                      <p className="text-sm text-slate-400">Affiliate linkiniz oluşturuluyor...</p>
+                    </div>
+                  )}
+                  <p className="mt-3 text-xs text-slate-500">Bu link üzerinden gerçekleşen satışlarda %10 komisyon kazanırsınız</p>
                 </div>
 
                 {/* Commissions List */}
@@ -862,43 +971,62 @@ export default function ProfilePage() {
                     <Gift className="h-4 w-4 text-indigo-400" />
                     Komisyon Geçmişi
                   </h3>
-                  <div className="text-center py-12">
-                    <TrendingUp className="h-16 w-16 mx-auto mb-4 text-slate-600" />
-                    <p className="text-lg font-semibold text-white">Henüz komisyon yok</p>
-                    <p className="mt-2 text-sm text-slate-400">Affiliate bağlantınızı paylaşmaya başlayın</p>
-                  </div>
+                  {(affiliateCommissions.length === 0) ? (
+                    <div className="text-center py-12">
+                      <TrendingUp className="h-16 w-16 mx-auto mb-4 text-slate-600" />
+                      <p className="text-lg font-semibold text-white">Henüz komisyon yok</p>
+                      <p className="mt-2 text-sm text-slate-400">Affiliate linkinizi paylaşmaya başlayın</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {affiliateCommissions.map((commission) => (
+                        <div key={commission.id} className="rounded-xl border border-white/10 bg-gradient-to-br from-slate-800/60 to-slate-900/60 p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-semibold text-white">Sipariş #{commission.orderId?.slice(0, 8) ?? '—'}</p>
+                              <p className="text-xs text-slate-400 mt-1">{formatDate(commission.createdAt)}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm font-bold text-green-400">${commission.amount}</p>
+                              <StatusBadge status={commission.status} />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             ) : null}
 
             {activeTab === 'referral' ? (
-              <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-slate-800/40 to-slate-900/40 p-8 backdrop-blur-sm">
+              <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-slate-800/40 to-slate-900/40 p-4 sm:p-8 backdrop-blur-sm">
                 <div className="mb-6">
                   <h2 className="text-xl font-bold text-white flex items-center gap-2">
                     <Users className="h-5 w-5 text-indigo-400" />
-                    Referans Program
+                    Referral Programı
                   </h2>
-                  <p className="mt-1 text-sm text-slate-400">Arkadaşlarınızı davet edin, ödüller kazanın</p>
+                  <p className="mt-1 text-sm text-slate-400">Arkadaşlarını davet et, ödül kazan</p>
                 </div>
 
                 {/* Stats Grid */}
-                <div className="grid gap-4 md:grid-cols-3 mb-8">
+                <div className="grid gap-4 grid-cols-1 sm:grid-cols-3 mb-6 sm:mb-8">
                   <div className="rounded-xl border border-white/10 bg-gradient-to-br from-indigo-500/10 to-purple-500/5 p-6">
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-xs font-medium text-slate-400">Toplam Davet</p>
                       <Users className="h-4 w-4 text-indigo-400" />
                     </div>
                     <p className="text-2xl font-bold text-white">{referralStats?.totalInvites ?? 0}</p>
-                    <p className="text-xs text-slate-500 mt-1">Davet ettiğiniz kişi sayısı</p>
+                    <p className="text-xs text-slate-500 mt-1">Davet edilen kişi sayısı</p>
                   </div>
 
                   <div className="rounded-xl border border-white/10 bg-gradient-to-br from-green-500/10 to-emerald-500/5 p-6">
                     <div className="flex items-center justify-between mb-2">
-                      <p className="text-xs font-medium text-slate-400">Başarılı Davet</p>
+                      <p className="text-xs font-medium text-slate-400">Başarılı Davetler</p>
                       <CheckCircle2 className="h-4 w-4 text-green-400" />
                     </div>
                     <p className="text-2xl font-bold text-white">{referralStats?.successfulInvites ?? 0}</p>
-                    <p className="text-xs text-slate-500 mt-1">Satın alan kişi sayısı</p>
+                    <p className="text-xs text-slate-500 mt-1">Sipariş veren kişi sayısı</p>
                   </div>
 
                   <div className="rounded-xl border border-white/10 bg-gradient-to-br from-yellow-500/10 to-orange-500/5 p-6">
@@ -907,7 +1035,7 @@ export default function ProfilePage() {
                       <Gift className="h-4 w-4 text-yellow-400" />
                     </div>
                     <p className="text-2xl font-bold text-white">€{referralStats?.totalRewards ?? '0.00'}</p>
-                    <p className="text-xs text-slate-500 mt-1">Kazandığınız toplam ödül</p>
+                    <p className="text-xs text-slate-500 mt-1">Kazanılan toplam ödül</p>
                   </div>
                 </div>
 
@@ -915,27 +1043,27 @@ export default function ProfilePage() {
                 <div className="mb-8 rounded-xl border border-white/10 bg-gradient-to-br from-indigo-500/10 to-purple-500/5 p-6">
                   <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
                     <Tag className="h-4 w-4 text-indigo-400" />
-                    Referans Kodunuz
+                    Referral Kodunuz
                   </h3>
-                  <div className="flex gap-3">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
                     <input
                       type="text"
                       readOnly
-                      value={profile?.username || 'YOUR_CODE'}
-                      className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-400 cursor-not-allowed"
+                      value={profile?.username || 'KODUNUZ'}
+                      className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-base text-slate-400 cursor-not-allowed min-h-[44px]"
                     />
                     <button
                       type="button"
                       onClick={() => {
-                        navigator.clipboard.writeText(profile?.username || 'YOUR_CODE');
-                        showToast({ title: 'Kod kopyalandı!', variant: 'success' });
+                        navigator.clipboard.writeText(profile?.username || 'KODUNUZ');
+                        showToast({ title: 'Kod kopyalandı', variant: 'success' });
                       }}
-                      className="rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition-all hover:shadow-xl hover:shadow-indigo-500/40 hover:scale-105"
+                      className="rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition-all hover:shadow-xl hover:shadow-indigo-500/40 hover:scale-105 min-h-[44px] whitespace-nowrap"
                     >
                       Kopyala
                     </button>
                   </div>
-                  <p className="mt-3 text-xs text-slate-500">Arkadaşlarınız bu kodu kullanarak kayıt olabilir, her satın almada ödül kazanırsınız</p>
+                  <p className="mt-3 text-xs text-slate-500">Arkadaşlarınız bu kodla kayıt olabilir, her siparişlerinde ödül kazanırsınız</p>
                 </div>
 
                 {/* Rewards List */}
@@ -944,26 +1072,45 @@ export default function ProfilePage() {
                     <Gift className="h-4 w-4 text-indigo-400" />
                     Ödül Geçmişi
                   </h3>
-                  <div className="text-center py-12">
-                    <Users className="h-16 w-16 mx-auto mb-4 text-slate-600" />
-                    <p className="text-lg font-semibold text-white">Henüz ödül yok</p>
-                    <p className="mt-2 text-sm text-slate-400">Referans kodunuzu paylaşmaya başlayın</p>
-                  </div>
+                  {(referralRewards.length === 0) ? (
+                    <div className="text-center py-12">
+                      <Users className="h-16 w-16 mx-auto mb-4 text-slate-600" />
+                      <p className="text-lg font-semibold text-white">Henüz ödül yok</p>
+                      <p className="mt-2 text-sm text-slate-400">Referral kodunuzu paylaşmaya başlayın</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {referralRewards.map((reward: ReferralReward) => (
+                        <div key={reward.id} className="rounded-xl border border-white/10 bg-gradient-to-br from-slate-800/60 to-slate-900/60 p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-semibold text-white">Sipariş #{reward.orderId?.slice(0, 8) ?? '—'}</p>
+                              <p className="text-xs text-slate-400 mt-1">{formatDate(reward.createdAt)}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm font-bold text-green-400">${reward.amount}</p>
+                              <StatusBadge status={reward.status} />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             ) : null}
           </div>
           
           {/* Modern Footer */}
-          <div className="mt-12 rounded-3xl border border-white/5 bg-gradient-to-br from-slate-900/60 to-slate-950/60 p-8 backdrop-blur-sm">
-            <div className="grid gap-8 md:grid-cols-3">
+          <div className="mt-8 sm:mt-12 rounded-2xl sm:rounded-3xl border border-white/5 bg-gradient-to-br from-slate-900/60 to-slate-950/60 p-4 sm:p-8 backdrop-blur-sm">
+            <div className="grid gap-6 sm:gap-8 sm:grid-cols-3">
               <div>
                 <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
                   <Gem className="h-4 w-4 text-indigo-400" />
                   AISHE
                 </h3>
                 <p className="text-xs text-slate-400 leading-relaxed">
-                  Profesyonel ve güvenilir paket yönetim sistemi. 
+                  Profesyonel ve güvenilir paket yönetim sistemi.
                   Müşteri memnuniyeti odaklı hizmet anlayışımızla yanınızdayız.
                 </p>
               </div>
@@ -979,7 +1126,7 @@ export default function ProfilePage() {
                   </Link>
                   <Link href="/dashboard" className="block text-xs text-slate-400 hover:text-indigo-400 transition-colors flex items-center gap-2">
                     <LayoutDashboard className="h-3 w-3" />
-                    Dashboard
+                    Panel
                   </Link>
                   <Link href="/order" className="block text-xs text-slate-400 hover:text-indigo-400 transition-colors flex items-center gap-2">
                     <ShoppingCart className="h-3 w-3" />
@@ -993,8 +1140,8 @@ export default function ProfilePage() {
                   İletişim
                 </h3>
                 <p className="text-xs text-slate-400 leading-relaxed">
-                  Sorularınız için destek bölümünden bize ulaşabilirsiniz. 
-                  Size en kısa sürede dönüş yapacağız.
+                  Sorularınız için destek bölümü üzerinden bize ulaşabilirsiniz.
+                  En kısa sürede size geri dönüş yapacağız.
                 </p>
               </div>
             </div>
@@ -1008,5 +1155,13 @@ export default function ProfilePage() {
         </section>
       </div>
     </main>
+  );
+}
+
+export default function ProfilePage() {
+  return (
+    <Suspense>
+      <ProfilePageContent />
+    </Suspense>
   );
 }
