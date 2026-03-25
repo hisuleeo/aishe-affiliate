@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { User, UserRoleType, UserStatus } from '@prisma/client';
@@ -14,6 +14,8 @@ const TOKEN_EXPIRES_IN = 60 * 60; // 1 saat
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly usersRepository: UsersRepository,
     private readonly jwtService: JwtService,
@@ -77,6 +79,9 @@ export class AuthService {
         code: normalizedUsername,
       },
     });
+
+    // Kullanıcı için affiliate link oluştur
+    await this.createAffiliateLink(user.id, normalizedUsername);
 
     // Referral signup kaydı oluştur (eğer referral code geçerliyse)
     if (referralUserId) {
@@ -158,8 +163,50 @@ export class AuthService {
           code: username,
         },
       });
+
+      // Kullanıcı için affiliate link oluştur
+      await this.createAffiliateLink(user.id, username);
     }
 
     return this.issueToken(user);
+  }
+
+  // Helper: Kullanıcı için affiliate link oluştur
+  private async createAffiliateLink(userId: string, username: string) {
+    // Aktif program bul veya oluştur
+    let program = await this.prisma.program.findFirst({ where: { status: 'active' } });
+    if (!program) {
+      program = await this.prisma.program.create({
+        data: {
+          name: 'AISHE Affiliate Program',
+          status: 'active',
+          attributionWindowDays: 30,
+          cookieTtlDays: 30,
+          defaultCurrency: 'EUR',
+        },
+      });
+    }
+
+    // Affiliate link oluştur - basit kod: username'in kendisi
+    const code = username;
+    const targetUrl = `https://app.aishe.pro/?ref=${code}`;
+    
+    // Aynı kod varsa skip et
+    const existing = await this.prisma.affiliateLink.findUnique({ where: { code } });
+    if (existing) {
+      this.logger.log(`Affiliate link zaten var: ${code}`);
+      return;
+    }
+
+    await this.prisma.affiliateLink.create({
+      data: {
+        affiliateId: userId,
+        programId: program.id,
+        code,
+        targetUrl,
+      },
+    });
+    
+    this.logger.log(`Affiliate link oluşturuldu: ${code} for user ${userId}`);
   }
 }

@@ -26,6 +26,10 @@ export class CreateOrderDto {
 
   @IsOptional()
   @IsString()
+  affiliateCode?: string;
+
+  @IsOptional()
+  @IsString()
   referralCode?: string;
 
   @IsOptional()

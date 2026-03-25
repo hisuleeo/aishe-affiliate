@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, User, UserRole, UserRoleType, UserStatus } from '@prisma/client';
+import { CommissionStatus, Prisma, User, UserRole, UserRoleType, UserStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { AppError } from '../common/errors/app-error';
 import { ErrorCodes } from '../common/errors/error-codes';
@@ -120,6 +120,47 @@ export class UsersService {
       username: normalizedUsername,
     });
 
+    // Sync referral code and affiliate links when username changes
+    if (normalizedUsername) {
+      // Update referral code to match new username
+      const referralCode = await this.prisma.referralCode.findFirst({ where: { userId: id } });
+      if (referralCode) {
+        const codeConflict = await this.prisma.referralCode.findUnique({ where: { code: normalizedUsername } });
+        if (!codeConflict || codeConflict.userId === id) {
+          await this.prisma.referralCode.update({
+            where: { id: referralCode.id },
+            data: { code: normalizedUsername },
+          });
+        }
+      }
+
+      // Update affiliate link targetUrl (and code if available) to match new username
+      const affiliateLinks = await this.prisma.affiliateLink.findMany({
+        where: { affiliateId: id },
+        orderBy: { createdAt: 'asc' },
+      });
+      for (let i = 0; i < affiliateLinks.length; i++) {
+        const link = affiliateLinks[i];
+        const newCode = i === 0 ? normalizedUsername : `${normalizedUsername}_${i + 1}`;
+        const codeConflict = await this.prisma.affiliateLink.findUnique({ where: { code: newCode } });
+        if (!codeConflict || codeConflict.affiliateId === id) {
+          await this.prisma.affiliateLink.update({
+            where: { id: link.id },
+            data: {
+              code: newCode,
+              targetUrl: `https://app.aishe.pro/?ref=${normalizedUsername}`,
+            },
+          });
+        } else {
+          // Just update the targetUrl even if code can't change
+          await this.prisma.affiliateLink.update({
+            where: { id: link.id },
+            data: { targetUrl: `https://app.aishe.pro/?ref=${normalizedUsername}` },
+          });
+        }
+      }
+    }
+
     return this.sanitizeUser(updated as User & { roles: UserRole[] });
   }
 
@@ -134,7 +175,16 @@ export class UsersService {
       return existing;
     }
 
-    const code = await this.generateReferralCode();
+    // Use username as referral code (falls back to AISHE-XXXXX if no username)
+    const user = await this.usersRepository.findById(userId);
+    let code: string;
+    if (user?.username) {
+      const taken = await this.prisma.referralCode.findUnique({ where: { code: user.username } });
+      code = taken ? await this.generateReferralCode() : user.username;
+    } else {
+      code = await this.generateReferralCode();
+    }
+
     return this.prisma.referralCode.create({
       data: {
         user: { connect: { id: userId } },
@@ -357,5 +407,94 @@ export class UsersService {
     }
 
     throw new AppError('Kullanıcı adı üretilemedi.', 500, ErrorCodes.INTERNAL_ERROR);
+  }
+
+  async getAffiliateStats(userId: string) {
+    // Commission'ları Conversion üzerinden çek
+    const [commissions, clicks] = await Promise.all([
+      this.prisma.commission.findMany({
+        where: { affiliateId: userId },
+        include: { 
+          conversion: {
+            include: {
+              order: {
+                include: {
+                  package: true,
+                },
+              },
+            },
+          },
+        },
+      }),
+      this.prisma.click.count({
+        where: { 
+          affiliateLink: {
+            affiliateId: userId,
+          },
+        },
+      }),
+    ]);
+
+    const totalConversions = commissions.length;
+    const totalEarnings = commissions.reduce((sum, c) => sum + Number(c.amount), 0);
+    const pendingEarnings = commissions
+      .filter(c => c.status === CommissionStatus.PENDING)
+      .reduce((sum, c) => sum + Number(c.amount), 0);
+    const paidEarnings = commissions
+      .filter(c => c.status === CommissionStatus.PAID)
+      .reduce((sum, c) => sum + Number(c.amount), 0);
+
+    const conversionRate = clicks > 0 ? (totalConversions / clicks) * 100 : 0;
+
+    return {
+      totalClicks: clicks,
+      totalConversions,
+      totalEarnings: totalEarnings.toFixed(2),
+      pendingEarnings: pendingEarnings.toFixed(2),
+      paidEarnings: paidEarnings.toFixed(2),
+      conversionRate: parseFloat(conversionRate.toFixed(2)),
+      currency: 'EUR',
+    };
+  }
+
+  async getAffiliateCommissions(userId: string) {
+    const commissions = await this.prisma.commission.findMany({
+      where: { affiliateId: userId },
+      include: {
+        conversion: {
+          include: {
+            order: {
+              include: {
+                package: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { conversion: { conversionAt: 'desc' } },
+    });
+
+    return commissions;
+  }
+
+  async getReferralRewards(userId: string) {
+    const rewards = await this.prisma.referralReward.findMany({
+      where: { referralUserId: userId },
+      include: {
+        signup: {
+          include: {
+            newUser: true,
+          },
+        },
+        order: {
+          include: {
+            package: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return rewards;
   }
 }

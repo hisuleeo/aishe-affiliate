@@ -15,6 +15,7 @@ import { DataModule } from './data/data.module';
 import { ExtensionsModule } from './extensions/extensions.module';
 import { ProgramsModule } from './programs/programs.module';
 import { SystemModule } from './system/system.module';
+import { ActionLogsModule } from './action-logs/action-logs.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { SystemModule } from './system/system.module';
     ExtensionsModule,
     ProgramsModule,
     SystemModule,
+    ActionLogsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

@@ -133,6 +133,7 @@ model User {
   extensionRequests    ExtensionRequest[] @relation("UserExtensionRequests")
   supportTickets       SupportTicket[]
   supportTicketReplies SupportTicketReply[]
+  actionLogs           ActionLog[]
 
   @@map("users")
 }
@@ -230,6 +231,7 @@ model Conversion {
   id              String     @id @default(uuid()) @db.Uuid
   programId       String     @db.Uuid @map("program_id")
   externalOrderId String     @unique @map("external_order_id")
+  orderId         String?    @unique @db.Uuid @map("order_id")
   amount          Decimal    @db.Decimal(18, 4)
   currency        String     @db.Char(3)
   conversionAt    DateTime   @default(now()) @map("conversion_at")
@@ -241,6 +243,7 @@ model Conversion {
   program   Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
   affiliate User?    @relation("AffiliateConversions", fields: [affiliateId], references: [id])
   referral  User?    @relation("ReferralConversions", fields: [referralId], references: [id])
+  order     Order?   @relation("OrderConversion", fields: [orderId], references: [id], onDelete: SetNull)
   commission Commission?
 
   @@index([conversionAt], map: "idx_conversions_conversion_at")
@@ -287,6 +290,8 @@ model Order {
   buyer             User                @relation("BuyerOrders", fields: [buyerId], references: [id], onDelete: Cascade)
   referralUser      User?               @relation("ReferralOrders", fields: [referralUserId], references: [id], onDelete: SetNull)
   package           Package             @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  conversion        Conversion?         @relation("OrderConversion")
+  referralRewards   ReferralReward[]
   extensionRequests ExtensionRequest[]
 
   @@index([buyerId, createdAt], map: "idx_orders_buyer_created")
@@ -431,13 +436,17 @@ model ReferralReward {
   id             String               @id @default(uuid()) @db.Uuid
   referralUserId String               @db.Uuid @map("referral_user_id")
   signupId       String               @db.Uuid @map("signup_id")
+  orderId        String?              @db.Uuid @map("order_id")
   amount         Decimal              @db.Decimal(18, 4)
   currency       String               @db.Char(3)
   status         ReferralRewardStatus @default(PENDING)
+  createdAt      DateTime             @default(now()) @map("created_at")
 
   referralUser User           @relation(fields: [referralUserId], references: [id], onDelete: Cascade)
   signup       ReferralSignup @relation(fields: [signupId], references: [id], onDelete: Cascade)
+  order        Order?         @relation(fields: [orderId], references: [id], onDelete: SetNull)
 
+  @@index([referralUserId, createdAt], map: "idx_referral_rewards_user_created")
   @@map("referral_rewards")
 }
 
@@ -527,4 +536,24 @@ model SystemSetting {
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("system_settings")
+}
+
+model ActionLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String?  @db.Uuid @map("user_id")
+  action     String   // 'order.created', 'user.registered', 'payout.approved', etc.
+  entityType String   @map("entity_type") // 'order', 'user', 'payout', etc.
+  entityId   String?  @db.Uuid @map("entity_id")
+  metadata   Json?    // Additional context data
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId], map: "idx_action_logs_user")
+  @@index([action], map: "idx_action_logs_action")
+  @@index([entityType, entityId], map: "idx_action_logs_entity")
+  @@index([createdAt], map: "idx_action_logs_created")
+  @@map("action_logs")
 }

@@ -241,6 +241,7 @@ export class SystemController {
       totalUsers,
       totalOrders,
       totalRevenue,
+      sampleOrder,
     ] = await Promise.all([
       // Total users
       this.prisma.user.count({
@@ -260,6 +261,15 @@ export class SystemController {
           ...whereWithDate,
         },
       }),
+
+      // Get currency from a sample order
+      this.prisma.order.findFirst({
+        where: {
+          status: 'PAID',
+          ...whereWithDate,
+        },
+        select: { currency: true },
+      }),
     ]);
 
     return {
@@ -267,6 +277,7 @@ export class SystemController {
         totalUsers,
         totalOrders,
         totalRevenue: totalRevenue._sum.amount || 0,
+        currency: sampleOrder?.currency || 'USD',
       },
     };
   }

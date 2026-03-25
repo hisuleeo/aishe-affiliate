@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { LedgerEntryType, Prisma, ReferralRewardStatus } from '@prisma/client';
+import { CommissionStatus, CommissionType, LedgerEntryType, Prisma, ReferralRewardStatus, WinnerType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 // Komisyon hesaplama servisi (Rule bazlı yapı)
@@ -7,6 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 export class CommissionsService {
   private readonly logger = new Logger(CommissionsService.name);
   private readonly defaultCommissionRate = new Prisma.Decimal(0.1);
+  private readonly defaultReferralRewardRate = new Prisma.Decimal(0.05);
 
   constructor(private readonly prisma: PrismaService) {}
 
@@ -14,7 +15,7 @@ export class CommissionsService {
   async calculateCommission(orderId: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { package: true },
+      include: { package: true, conversion: true },
     });
 
     if (!order) {
@@ -22,20 +23,86 @@ export class CommissionsService {
       return;
     }
 
-    // 1. Affiliate komisyonu (eğer varsa)
-    if (order.affiliateId) {
-      await this.calculateAffiliateCommission(order);
+    // Conversion zaten varsa tekrar oluşturma
+    if (order.conversion) {
+      this.logger.log(`Conversion zaten var: order=${orderId}`);
+      return;
     }
 
-    // 2. Referral ödülü (eğer kullanıcı referral ile kayıt olduysa)
-    await this.calculateReferralReward(order);
+    // 1. Program bul veya oluştur
+    const program = await this.getOrCreateProgram();
+
+    // 2. Winner logic: Affiliate veya Referral olmalı
+    if (!order.affiliateId && !order.referralUserId) {
+      this.logger.log(`Order ${orderId} - No affiliate or referral, skipping conversion`);
+      return;
+    }
+
+    const winnerType: WinnerType = order.affiliateId ? WinnerType.AFFILIATE : WinnerType.REFERRAL;
+    const winnerId = order.affiliateId || order.referralUserId!;
+
+    // 3. Conversion oluştur
+    const conversion = await this.prisma.conversion.create({
+      data: {
+        programId: program.id,
+        orderId: order.id,
+        externalOrderId: order.id,
+        amount: order.amount,
+        currency: order.currency,
+        affiliateId: order.affiliateId,
+        referralId: order.referralUserId,
+        winnerType,
+        winnerId,
+      },
+    });
+
+    this.logger.log(`Conversion oluşturuldu: ${conversion.id} for order=${orderId}`);
+
+    // 4. Affiliate komisyonu oluştur
+    if (order.affiliateId) {
+      await this.createAffiliateCommission(conversion, order);
+    }
+
+    // 5. Referral reward oluştur
+    if (order.referralUserId) {
+      await this.createReferralReward(conversion, order);
+    }
   }
 
-  private async calculateAffiliateCommission(order: any) {
-    const rule = await this.findApplicableRule(order.packageId);
-    const commissionRate = rule?.commissionRate ?? this.defaultCommissionRate;
-    const commissionAmount = order.amount.mul(commissionRate);
+  private async getOrCreateProgram() {
+    let program = await this.prisma.program.findFirst({ where: { status: 'active' } });
+    if (!program) {
+      program = await this.prisma.program.create({
+        data: {
+          name: 'AISHE Affiliate Program',
+          status: 'active',
+          attributionWindowDays: 30,
+          cookieTtlDays: 30,
+          defaultCurrency: 'EUR',
+        },
+      });
+    }
+    return program;
+  }
 
+  private async createAffiliateCommission(conversion: any, order: any) {
+    // Commission rate: package'dan al veya default
+    const commissionRate = order.package?.commissionRate ?? this.defaultCommissionRate;
+    const commissionAmount = new Prisma.Decimal(order.amount).mul(commissionRate);
+
+    // Commission oluştur
+    await this.prisma.commission.create({
+      data: {
+        conversionId: conversion.id,
+        affiliateId: order.affiliateId,
+        type: CommissionType.PERCENTAGE,
+        amount: commissionAmount,
+        currency: order.currency,
+        status: CommissionStatus.PENDING,
+      },
+    });
+
+    // AffiliateLedger'a da yaz (backward compatibility)
     await this.writeLedgerEntry({
       affiliateId: order.affiliateId,
       amount: commissionAmount,
@@ -44,14 +111,14 @@ export class CommissionsService {
     });
 
     this.logger.log(
-      `Komisyon ledger kaydı oluşturuldu: order=${order.id}, rate=${commissionRate.toString()}, amount=${commissionAmount.toString()}`,
+      `Affiliate commission oluşturuldu: order=${order.id}, affiliate=${order.affiliateId}, rate=${commissionRate.toString()}, amount=${commissionAmount.toString()}`,
     );
   }
 
-  private async calculateReferralReward(order: any) {
+  private async createReferralReward(conversion: any, order: any) {
     // Kullanıcının referral signup kaydını bul
     const signup = await this.prisma.referralSignup.findFirst({
-      where: { newUserId: order.userId },
+      where: { newUserId: order.buyerId },
       include: {
         invite: {
           include: {
@@ -62,7 +129,7 @@ export class CommissionsService {
     });
 
     if (!signup) {
-      this.logger.log(`Referral signup yok: user=${order.userId}`);
+      this.logger.log(`Referral signup yok: buyer=${order.buyerId}`);
       return;
     }
 
@@ -70,14 +137,14 @@ export class CommissionsService {
     const referralUserId = signup.invite.code.userId;
 
     // Ödül oranı: %5 (varsayılan)
-    const rewardRate = new Prisma.Decimal(0.05);
-    const rewardAmount = order.amount.mul(rewardRate);
+    const rewardAmount = new Prisma.Decimal(order.amount).mul(this.defaultReferralRewardRate);
 
-    // Her sipariş için yeni reward oluştur (signup birden fazla sipariş verebilir)
+    // Reward oluştur (her sipariş için yeni reward)
     await this.prisma.referralReward.create({
       data: {
         referralUserId,
         signupId: signup.id,
+        orderId: order.id,
         amount: rewardAmount,
         currency: order.currency,
         status: ReferralRewardStatus.PENDING,

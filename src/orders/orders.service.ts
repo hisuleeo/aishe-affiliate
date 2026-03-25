@@ -9,6 +9,7 @@ import { CreateOrderDto } from './dto/create-order.dto';
 import { OrdersRepository } from './orders.repository';
 import { OrderCreatedEvent } from './events/order-created.event';
 import { OrderPaidEvent } from './events/order-paid.event';
+import { ActionLogsService } from '../action-logs/action-logs.service';
 
 // Sipariş iş mantığı
 @Injectable()
@@ -18,6 +19,7 @@ export class OrdersService {
     private readonly packagesService: PackagesService,
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly actionLogsService: ActionLogsService,
   ) {}
 
   listByBuyer(buyerId: string): Promise<Order[]> {
@@ -30,6 +32,17 @@ export class OrdersService {
 
   async createOrder(buyerId: string, payload: CreateOrderDto): Promise<Order> {
   const pkg = await this.packagesService.getById(payload.packageId);
+
+    // affiliateCode'dan affiliateId'yi çöz
+    let resolvedAffiliateId = payload.affiliateId;
+    if (!resolvedAffiliateId && payload.affiliateCode) {
+      const affiliateLink = await this.prisma.affiliateLink.findUnique({
+        where: { code: payload.affiliateCode },
+      });
+      if (affiliateLink) {
+        resolvedAffiliateId = affiliateLink.affiliateId;
+      }
+    }
 
     // Eğer referralCode payload'da yoksa, kullanıcının referral signup kaydından al
     let referralCode = payload.referralCode;
@@ -50,7 +63,7 @@ export class OrdersService {
       }
     }
 
-    const attribution = await this.resolveAttribution(payload.affiliateId, referralCode);
+    const attribution = await this.resolveAttribution(resolvedAffiliateId, referralCode);
 
     // validUntil: 1 ay sonra
     const validUntil = new Date();
@@ -116,6 +129,28 @@ export class OrdersService {
         referralUserId: order.referralUserId ?? undefined,
       }),
     );
+
+    // Log order creation
+    try {
+      await this.actionLogsService.log({
+        userId: buyerId,
+        action: 'order.created',
+        entityType: 'Order',
+        entityId: order.id,
+        metadata: {
+          packageId: pkg.id,
+          packageName: pkg.name,
+          amount: order.amount,
+          currency: order.currency,
+          attributionType: order.attributionType,
+          affiliateId: order.affiliateId,
+          referralCode: order.referralCode,
+        },
+      });
+    } catch (err) {
+      // Log hatası ana işlemi engellemez
+      console.error('Action log error:', err);
+    }
 
     return order;
   }

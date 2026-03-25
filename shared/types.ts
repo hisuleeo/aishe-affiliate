@@ -103,7 +103,7 @@ export type PackageOption = {
 
 export type OrderStatus = 'pending' | 'paid' | 'failed' | 'canceled';
 
-export type OrderAttributionType = 'none' | 'affiliate' | 'referral';
+export type OrderAttributionType = 'NONE' | 'AFFILIATE' | 'REFERRAL';
 
 export type Order = {
   id: string;

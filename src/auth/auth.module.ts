@@ -6,6 +6,7 @@ import { AuthService } from './auth.service';
 import { UsersModule } from '../users/users.module';
 import { JwtStrategy } from '../strategies/jwt.strategy';
 import { GoogleStrategy } from '../strategies/google.strategy';
+import { ActionLogsModule } from '../action-logs/action-logs.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { GoogleStrategy } from '../strategies/google.strategy';
       secret: process.env.JWT_SECRET ?? 'dev-secret',
       signOptions: { expiresIn: '1h' },
     }),
+    ActionLogsModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy, GoogleStrategy],
