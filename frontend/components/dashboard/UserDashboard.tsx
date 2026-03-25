@@ -139,7 +139,9 @@ export default function UserDashboard() {
   const affiliateInputRef = useRef<HTMLInputElement | null>(null);
 
   const latestOrders = useMemo(() => (orders ?? []).slice(0, 5), [orders]);
-  const activeOrder = latestOrders[0] ?? null;
+  const latestOrder = latestOrders[0] ?? null;
+  const activeOrder = useMemo(() => (orders ?? []).find((o) => o.status === 'paid') ?? null, [orders]);
+  const pendingOrder = useMemo(() => (orders ?? []).find((o) => o.status === 'pending') ?? null, [orders]);
 
   const totalSpend = useMemo(
     () => (orders ?? []).reduce((sum, o) => sum + Number(o.amount), 0),
@@ -223,6 +225,22 @@ export default function UserDashboard() {
         </div>
       </div>
 
+      {/* Pending Sipariş Uyarısı */}
+      {!ordersLoading && pendingOrder && !activeOrder && (
+        <div className="rounded-2xl border border-amber-500/40 bg-amber-500/8 px-5 py-4">
+          <div className="flex items-start gap-3">
+            <Clock className="h-5 w-5 text-amber-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-amber-300">Siparişiniz admin onayı bekliyor</p>
+              <p className="mt-1 text-xs text-amber-400/80">
+                <span className="font-medium text-amber-200">{packageMap.get(pendingOrder.packageId)?.name ?? 'Paketiniz'}</span> için
+                siparişiniz alındı. Admin onayladıktan sonra AISHE aboneliğiniz otomatik olarak başlayacak.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Stat Kartları */}
       <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
         <StatCard
@@ -243,11 +261,15 @@ export default function UserDashboard() {
               ? '—'
               : activeOrder
               ? (packageMap.get(activeOrder.packageId)?.name ?? '—')
+              : pendingOrder
+              ? 'Onay Bekleniyor'
               : 'Yok'
           }
           subtitle={
             activeOrder?.validUntil
               ? `Geçerlilik: ${formatDate(activeOrder.validUntil)}`
+              : pendingOrder
+              ? (packageMap.get(pendingOrder.packageId)?.name ?? 'Sipariş beklemede')
               : 'Henüz paket yok.'
           }
         />
@@ -329,6 +351,25 @@ export default function UserDashboard() {
               <div className="h-5 w-3/4 animate-pulse rounded bg-slate-800" />
               <div className="h-8 w-1/2 animate-pulse rounded bg-slate-800" />
               <div className="h-3 w-full animate-pulse rounded bg-slate-800/60" />
+            </div>
+          ) : !activeOrder && pendingOrder ? (
+            <div className="rounded-[24px] border border-amber-500/30 bg-amber-500/5 p-5 text-center">
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-amber-500/30 bg-amber-500/10">
+                <Clock className="h-6 w-6 text-amber-400" />
+              </div>
+              <p className="font-semibold text-amber-300">Onay Bekleniyor</p>
+              <p className="mt-1 text-xs text-amber-400/70">
+                {packageMap.get(pendingOrder.packageId)?.name ?? 'Paketiniz'} siparişi admin tarafından inceleniyor.
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                {new Date(pendingOrder.createdAt).toLocaleString('tr-TR')}
+              </p>
+              {pendingOrder.aisheId && (
+                <div className="mt-3 rounded-xl border border-amber-500/20 bg-slate-950/60 p-2.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">AISHE ID</p>
+                  <p className="mt-0.5 font-mono text-xs font-semibold text-amber-300">{pendingOrder.aisheId}</p>
+                </div>
+              )}
             </div>
           ) : !activeOrder ? (
             <EmptyState

@@ -237,31 +237,54 @@ function OrderContent() {
           </div>
         </header>
         <div className="mx-auto flex max-w-lg flex-col items-center justify-center px-4 sm:px-6 py-16 sm:py-24 text-center">
-          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/20 border border-emerald-500/40">
-            <svg className="h-10 w-10 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          {/* İkon */}
+          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-amber-500/20 border border-amber-500/40">
+            <svg className="h-10 w-10 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
-          <h1 className="mt-6 text-3xl font-bold text-white">Order Received!</h1>
-          <p className="mt-3 text-sm text-slate-400">
-            Your order has been successfully created. You can download the AISHE application and complete the setup.
+
+          <h1 className="mt-6 text-3xl font-bold text-white">Siparişiniz Alındı!</h1>
+          <p className="mt-3 text-base font-semibold text-amber-300">Admin onayı bekleniyor</p>
+          <p className="mt-2 text-sm text-slate-400">
+            Siparişiniz başarıyla oluşturuldu. Admin onayının ardından AISHE aboneliğiniz otomatik olarak aktifleşecek ve size bildirim gelecek.
           </p>
-          <a
-            href="/docs/Aishe_Install.exe"
-            download="Aishe_Install.exe"
-            className="mt-8 inline-flex items-center gap-3 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 px-8 py-4 text-base font-bold text-white shadow-lg shadow-indigo-500/30 transition-all hover:scale-105 hover:shadow-xl hover:shadow-indigo-500/40"
-          >
-            <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            AISHE İndir (.exe)
-          </a>
-          <div className="mt-6 flex items-center gap-4">
+
+          {/* Bilgi Kutuları */}
+          <div className="mt-8 w-full space-y-3 text-left">
+            <div className="flex items-start gap-3 rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-3">
+              <span className="text-lg">1️⃣</span>
+              <div>
+                <p className="text-sm font-semibold text-white">Sipariş alındı</p>
+                <p className="text-xs text-slate-400">Siparişiniz sistemimize kaydedildi.</p>
+              </div>
+              <svg className="ml-auto h-5 w-5 flex-shrink-0 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3">
+              <span className="text-lg">2️⃣</span>
+              <div>
+                <p className="text-sm font-semibold text-amber-300">Admin onayı</p>
+                <p className="text-xs text-amber-400/70">Ekibimiz siparişinizi inceleyecek.</p>
+              </div>
+              <div className="ml-auto h-5 w-5 flex-shrink-0 rounded-full border-2 border-amber-400/60 border-t-amber-400 animate-spin" />
+            </div>
+            <div className="flex items-start gap-3 rounded-xl border border-slate-800/50 bg-slate-900/30 px-4 py-3 opacity-50">
+              <span className="text-lg">3️⃣</span>
+              <div>
+                <p className="text-sm font-semibold text-slate-300">AISHE aktifleşir</p>
+                <p className="text-xs text-slate-500">Aboneliğiniz başlayacak ve AISHE kullanıma hazır olacak.</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Link
               href="/dashboard"
-              className="rounded-lg border border-slate-700 px-5 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:text-white"
+              className="rounded-xl border border-indigo-500/50 bg-indigo-500/10 px-6 py-3 text-sm font-semibold text-indigo-300 transition hover:bg-indigo-500/20"
             >
-              Go to Dashboard
+              Panele Git
             </Link>
             <button
               type="button"
@@ -273,9 +296,9 @@ function OrderContent() {
                 setNeedsInvoice(false);
                 setInvoiceInfo({ companyName: '', taxNumber: '', taxOffice: '', address: '' });
               }}
-              className="rounded-lg border border-slate-700 px-5 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:text-white"
+              className="rounded-xl border border-slate-700 px-6 py-3 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:text-white"
             >
-              New Order
+              Yeni Sipariş
             </button>
           </div>
         </div>

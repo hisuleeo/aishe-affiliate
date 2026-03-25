@@ -22,17 +22,20 @@ export class OrdersRepository {
     });
   }
 
-  findAll(attributionType?: OrderAttributionType): Promise<Order[]> {
+  findAll(attributionType?: OrderAttributionType) {
     return this.prisma.order.findMany({
       where: attributionType ? { attributionType } : undefined,
       orderBy: { createdAt: 'desc' },
+      include: {
+        buyer: { select: { id: true, email: true, name: true } },
+      },
     });
   }
 
-  updateStatus(id: string, status: OrderStatus): Promise<Order> {
+  updateStatus(id: string, status: OrderStatus, validUntil?: Date): Promise<Order> {
     return this.prisma.order.update({
       where: { id },
-      data: { status },
+      data: { status, ...(validUntil ? { validUntil } : {}) },
     });
   }
 }

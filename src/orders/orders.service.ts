@@ -65,10 +65,6 @@ export class OrdersService {
 
     const attribution = await this.resolveAttribution(resolvedAffiliateId, referralCode);
 
-    // validUntil: 1 ay sonra
-    const validUntil = new Date();
-    validUntil.setMonth(validUntil.getMonth() + 1);
-
     // Custom paketlerde fiyat hesaplama: base(25) + özellik sayısı × 10 + limitSize × 50
     let calculatedAmount = Number(pkg.price);
     if (pkg.isCustom) {
@@ -83,7 +79,7 @@ export class OrdersService {
   const order = await this.ordersRepository.create({
       buyer: { connect: { id: buyerId } },
       package: { connect: { id: pkg.id } },
-      status: OrderStatus.PAID, // Direkt PAID olarak oluştur (ödeme sistemi yok)
+      status: OrderStatus.PENDING, // Admin onayına kadar beklemede
       amount: calculatedAmount,
       currency: pkg.currency,
       attributionType: attribution.type,
@@ -93,7 +89,6 @@ export class OrdersService {
       selectedOptions: payload.selectedOptions || undefined,
       needsInvoice: payload.needsInvoice,
       invoiceInfo: payload.invoiceInfo ? (payload.invoiceInfo as any) : undefined,
-      validUntil,
       referralUser: attribution.referralUserId
         ? { connect: { id: attribution.referralUserId } }
         : undefined,
@@ -109,22 +104,6 @@ export class OrdersService {
         currency: order.currency,
         status: order.status,
         attributionType: order.attributionType,
-        affiliateId: order.affiliateId ?? undefined,
-        referralUserId: order.referralUserId ?? undefined,
-      }),
-    );
-
-    // OrderPaid event'ini de tetikle (komisyon/reward hesaplaması için)
-    this.eventEmitter.emit(
-      'order.paid',
-      new OrderPaidEvent({
-        orderId: order.id,
-        buyerId,
-        packageId: pkg.id,
-        amount: order.amount as Prisma.Decimal,
-        currency: order.currency,
-        status: order.status,
-        commissionRate: pkg.commissionRate,
         affiliateId: order.affiliateId ?? undefined,
         referralUserId: order.referralUserId ?? undefined,
       }),
@@ -173,7 +152,12 @@ export class OrdersService {
       );
     }
 
-    const updated = await this.ordersRepository.updateStatus(orderId, status);
+    // Onaylanırken validUntil = 30 gün sonra
+    const validUntil = status === OrderStatus.PAID
+      ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+      : undefined;
+
+    const updated = await this.ordersRepository.updateStatus(orderId, status, validUntil);
 
     if (status === OrderStatus.PAID) {
       const pkg = await this.packagesService.getById(order.packageId);

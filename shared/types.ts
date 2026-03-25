@@ -121,6 +121,7 @@ export type Order = {
   validUntil?: string | null;
   createdAt: string;
   package?: Package;
+  buyer?: { id: string; email: string; name: string | null } | null;
 };
 
 export type ExtensionRequestStatus = 'PENDING' | 'PAID' | 'FAILED' | 'CANCELED';

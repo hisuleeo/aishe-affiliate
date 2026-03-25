@@ -97,13 +97,15 @@ export default function AdminDashboard() {
     const items = orders ?? [];
     const affiliateOrders = items.filter((order) => order.attributionType === 'AFFILIATE');
     const referralOrders = items.filter((order) => order.attributionType === 'REFERRAL');
-    const totalRevenue = items.reduce((sum, order) => sum + Number(order.amount), 0);
-    const affiliateRevenue = affiliateOrders.reduce((sum, order) => sum + Number(order.amount), 0);
-    const referralRevenue = referralOrders.reduce((sum, order) => sum + Number(order.amount), 0);
+    const pendingOrders = items.filter((order) => order.status === 'pending');
+    const totalRevenue = items.filter((o) => o.status === 'paid').reduce((sum, order) => sum + Number(order.amount), 0);
+    const affiliateRevenue = affiliateOrders.filter((o) => o.status === 'paid').reduce((sum, order) => sum + Number(order.amount), 0);
+    const referralRevenue = referralOrders.filter((o) => o.status === 'paid').reduce((sum, order) => sum + Number(order.amount), 0);
     const currency = items[0]?.currency ?? 'EUR';
 
     return {
       totalOrders: items.length,
+      pendingOrders: pendingOrders.length,
       affiliateOrders: affiliateOrders.length,
       referralOrders: referralOrders.length,
       totalRevenue,
@@ -198,6 +200,32 @@ export default function AdminDashboard() {
       case 'overview':
         return (
           <div className="space-y-8">
+            {/* Bekleyen Onaylar Uyarısı */}
+            {ordersSummary.pendingOrders > 0 && (
+              <button
+                type="button"
+                onClick={() => setActiveTab('orders')}
+                className="w-full rounded-2xl border border-amber-500/40 bg-amber-500/10 px-6 py-4 text-left transition hover:bg-amber-500/15"
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">⏳</span>
+                    <div>
+                      <p className="font-semibold text-amber-300">
+                        {ordersSummary.pendingOrders} sipariş onay bekliyor
+                      </p>
+                      <p className="text-xs text-amber-400/70">
+                        Kullanıcıların AISHE abonelikleri aktifleştirmek için siparişleri onaylamanız gerekiyor.
+                      </p>
+                    </div>
+                  </div>
+                  <span className="flex-shrink-0 rounded-lg border border-amber-500/50 bg-amber-500/20 px-4 py-2 text-xs font-semibold text-amber-300">
+                    Siparişleri Gör →
+                  </span>
+                </div>
+              </button>
+            )}
+
             {/* Stats Grid */}
             <div>
               <h2 className="mb-4 text-xl sm:text-2xl font-bold">Attribution Özeti</h2>
@@ -697,7 +725,16 @@ export default function AdminDashboard() {
                 }`}
               >
                 <span className="text-lg flex-shrink-0">{item.icon}</span>
-                {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
+                {!sidebarCollapsed && (
+                  <span className="flex flex-1 items-center justify-between truncate">
+                    <span className="truncate">{item.label}</span>
+                    {item.id === 'orders' && ordersSummary.pendingOrders > 0 && (
+                      <span className="ml-1 flex-shrink-0 rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold text-black">
+                        {ordersSummary.pendingOrders}
+                      </span>
+                    )}
+                  </span>
+                )}
               </button>
             ))}
           </nav>
