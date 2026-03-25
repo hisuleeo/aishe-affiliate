@@ -71,6 +71,122 @@ const STEPS = [
   },
 ];
 
+const CAPABILITIES = [
+  {
+    id: 'privacy',
+    badge: 'Local & Private',
+    title: 'Local Autonomy and\nPrivacy-First Infrastructure',
+    color: 'cyan',
+    icon: (
+      <svg viewBox="0 0 48 48" fill="none" className="h-full w-full" xmlns="http://www.w3.org/2000/svg">
+        <rect x="4" y="10" width="40" height="28" rx="4" stroke="currentColor" strokeWidth="2.5" />
+        <rect x="14" y="38" width="20" height="4" rx="1.5" stroke="currentColor" strokeWidth="2.5" />
+        <circle cx="24" cy="24" r="6" stroke="currentColor" strokeWidth="2.5" />
+        <path d="M24 18v-4M24 34v-4M18 24h-4M34 24h-4" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+        <circle cx="24" cy="24" r="2" fill="currentColor" />
+      </svg>
+    ),
+    items: [
+      {
+        title: 'Edge Computing Performance',
+        desc: 'AISHE is an autonomous AI system designed to run locally on your own computer.',
+      },
+      {
+        title: 'Zero Cloud Dependency',
+        desc: 'It can be installed on your machine and used without a constant cloud connection, ensuring your data remains in your hands.',
+      },
+      {
+        title: 'User-Defined Data Environment',
+        desc: 'All settings for usage and the data processed by AISHE are defined exclusively by you on your own device.',
+      },
+    ],
+  },
+  {
+    id: 'automation',
+    badge: 'Full Control',
+    title: 'Fully Configurable\nTask Automation',
+    color: 'indigo',
+    icon: (
+      <svg viewBox="0 0 48 48" fill="none" className="h-full w-full" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="24" cy="24" r="8" stroke="currentColor" strokeWidth="2.5" />
+        <path d="M24 4v4M24 40v4M4 24h4M40 24h4" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+        <path d="M9.37 9.37l2.83 2.83M35.8 35.8l2.83 2.83M9.37 38.63l2.83-2.83M35.8 12.2l2.83-2.83" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+        <circle cx="24" cy="24" r="3" fill="currentColor" />
+      </svg>
+    ),
+    items: [
+      {
+        title: 'Granular Permission Controls',
+        desc: 'You define exactly which tasks the system is allowed to perform and which specific data sets it may process.',
+      },
+      {
+        title: 'Dynamic Workflow Support',
+        desc: 'AISHE offers various functions for automation and assistance with complex tasks to simplify your daily processes.',
+      },
+      {
+        title: 'Real-Time Adjustments',
+        desc: 'You can restrict, pause, or completely stop any autonomous features at any time to maintain full oversight.',
+      },
+    ],
+  },
+  {
+    id: 'efficiency',
+    badge: 'Smart & Fast',
+    title: 'Workflow Efficiency and\nInformation Structure',
+    color: 'violet',
+    icon: (
+      <svg viewBox="0 0 48 48" fill="none" className="h-full w-full" xmlns="http://www.w3.org/2000/svg">
+        <path d="M8 36L18 22l8 8 6-10 8 16" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M8 8v32h32" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+        <circle cx="18" cy="22" r="2.5" fill="currentColor" />
+        <circle cx="26" cy="30" r="2.5" fill="currentColor" />
+        <circle cx="32" cy="20" r="2.5" fill="currentColor" />
+        <circle cx="40" cy="36" r="2.5" fill="currentColor" />
+      </svg>
+    ),
+    items: [
+      {
+        title: 'Smart Information Analysis',
+        desc: 'The system can support the analysis of large volumes of information to help structure and organize your digital workspace.',
+      },
+      {
+        title: 'Time-Saving Automations',
+        desc: 'AISHE is built to make workflows more efficient, allowing you to automate repetitive tasks and focus on higher-level activities.',
+      },
+      {
+        title: 'Business Process Integration',
+        desc: 'For professional environments, AISHE can be used in business processes to support organizational tasks and information management.',
+      },
+    ],
+  },
+  {
+    id: 'access',
+    badge: 'No Risk',
+    title: 'Transparent and\nRisk-Free Access',
+    color: 'emerald',
+    icon: (
+      <svg viewBox="0 0 48 48" fill="none" className="h-full w-full" xmlns="http://www.w3.org/2000/svg">
+        <path d="M24 6L10 12v12c0 9.94 6.18 18.48 14 20 7.82-1.52 14-10.06 14-20V12L24 6z" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" />
+        <path d="M18 24l4 4 8-8" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+    items: [
+      {
+        title: 'Non-Binding Evaluation',
+        desc: 'You can test the software in a free, non-binding version to explore its functional benefits firsthand.',
+      },
+      {
+        title: 'No Barrier to Entry',
+        desc: 'Experience the system with no registration and no long-term commitment required.',
+      },
+      {
+        title: 'Functional Focus',
+        desc: 'The software focuses entirely on providing high-quality assistance and task simplification rather than promising specific success or gains.',
+      },
+    ],
+  },
+];
+
 const HIGHLIGHTS = [
   {
     title: 'AI Power',
@@ -351,6 +467,7 @@ export default function HomePage() {
           </div>
           <nav className="hidden items-center gap-6 text-sm text-slate-300 md:flex">
             <a href="#features" className="transition hover:text-white">Features</a>
+            <a href="#capabilities" className="transition hover:text-white">Capabilities</a>
             <a href="#workflow" className="transition hover:text-white">Workflow</a>
             <a href="#pricing" className="transition hover:text-white">Pricing</a>
             <a href="#faq" className="transition hover:text-white">FAQ</a>
@@ -387,6 +504,9 @@ export default function HomePage() {
               <div className="flex flex-col gap-3 text-sm text-slate-200">
                 <a href="#features" className="transition hover:text-white" onClick={() => setIsMenuOpen(false)}>
                   Features
+                </a>
+                <a href="#capabilities" className="transition hover:text-white" onClick={() => setIsMenuOpen(false)}>
+                  Capabilities
                 </a>
                 <a href="#workflow" className="transition hover:text-white" onClick={() => setIsMenuOpen(false)}>
                   Workflow
@@ -552,6 +672,113 @@ export default function HomePage() {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ── Detailed Features & Capabilities ── */}
+        <section id="capabilities" className="relative py-16 sm:py-28 overflow-hidden">
+          {/* Background glows */}
+          <div className="pointer-events-none absolute left-0 top-1/4 h-[500px] w-[500px] -translate-x-1/2 rounded-full bg-indigo-500/10 blur-[120px]" />
+          <div className="pointer-events-none absolute right-0 bottom-1/4 h-[400px] w-[400px] translate-x-1/2 rounded-full bg-cyan-500/10 blur-[120px]" />
+
+          <div className="relative mx-auto max-w-6xl px-4 sm:px-6">
+            {/* Section header */}
+            <div className="mx-auto max-w-2xl text-center reveal">
+              <p className="text-xs font-semibold uppercase tracking-[0.4em] text-indigo-300">Capabilities</p>
+              <h2 className="mt-4 text-3xl sm:text-4xl font-bold leading-tight">
+                Detailed Features &amp;<br />
+                <span className="bg-gradient-to-r from-indigo-400 via-cyan-400 to-violet-400 bg-clip-text text-transparent">
+                  Capabilities of AISHE
+                </span>
+              </h2>
+              <p className="mt-4 text-sm text-slate-400 leading-relaxed">
+                A comprehensive overview of everything AISHE brings to your workflow — from privacy-first infrastructure to transparent, risk-free access.
+              </p>
+            </div>
+
+            {/* Capability Cards */}
+            <div className="mt-16 space-y-8">
+              {CAPABILITIES.map((cap, capIndex) => {
+                const colorMap: Record<string, { border: string; bg: string; icon: string; badge: string; dot: string; glow: string }> = {
+                  cyan:    { border: 'border-cyan-500/25',    bg: 'from-cyan-500/8 to-transparent',    icon: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/30',    badge: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',    dot: 'bg-cyan-400',    glow: 'shadow-cyan-500/20' },
+                  indigo:  { border: 'border-indigo-500/25',  bg: 'from-indigo-500/8 to-transparent',  icon: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/30',  badge: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30',  dot: 'bg-indigo-400',  glow: 'shadow-indigo-500/20' },
+                  violet:  { border: 'border-violet-500/25',  bg: 'from-violet-500/8 to-transparent',  icon: 'text-violet-400 bg-violet-500/10 border-violet-500/30',  badge: 'bg-violet-500/15 text-violet-300 border-violet-500/30',  dot: 'bg-violet-400',  glow: 'shadow-violet-500/20' },
+                  emerald: { border: 'border-emerald-500/25', bg: 'from-emerald-500/8 to-transparent', icon: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30', badge: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30', dot: 'bg-emerald-400', glow: 'shadow-emerald-500/20' },
+                };
+                const c = colorMap[cap.color];
+                const isEven = capIndex % 2 === 0;
+
+                return (
+                  <div
+                    key={cap.id}
+                    className={`group relative overflow-hidden rounded-3xl border ${c.border} bg-gradient-to-br ${c.bg} bg-slate-950/60 p-6 sm:p-10 transition-all duration-500 hover:shadow-2xl ${c.glow} reveal reveal-delay-${(capIndex % 3) + 1}`}
+                  >
+                    {/* Subtle background grid */}
+                    <div className="pointer-events-none absolute inset-0 opacity-[0.02]" style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
+
+                    <div className={`flex flex-col gap-8 lg:gap-12 ${isEven ? 'lg:flex-row' : 'lg:flex-row-reverse'}`}>
+
+                      {/* Left / Right: Icon + Title */}
+                      <div className="flex flex-col justify-center gap-5 lg:w-72 xl:w-80 flex-shrink-0">
+                        {/* Icon */}
+                        <div className={`flex h-20 w-20 items-center justify-center rounded-2xl border ${c.icon} p-4 transition-transform duration-300 group-hover:scale-110 group-hover:shadow-lg`}>
+                          {cap.icon}
+                        </div>
+                        {/* Badge */}
+                        <span className={`inline-flex w-fit items-center gap-1.5 rounded-full border ${c.badge} px-3 py-1 text-xs font-semibold`}>
+                          <span className={`h-1.5 w-1.5 rounded-full ${c.dot}`} />
+                          {cap.badge}
+                        </span>
+                        {/* Title */}
+                        <h3 className="text-2xl sm:text-3xl font-bold leading-tight text-white whitespace-pre-line">
+                          {cap.title}
+                        </h3>
+                        <p className="text-xs text-slate-500 uppercase tracking-widest">
+                          {cap.items.length} core capabilities
+                        </p>
+                      </div>
+
+                      {/* Items grid */}
+                      <div className="grid gap-4 sm:grid-cols-3 flex-1 content-center">
+                        {cap.items.map((item, itemIndex) => (
+                          <div
+                            key={item.title}
+                            className="relative rounded-2xl border border-slate-800/60 bg-slate-950/50 p-5 transition-all duration-300 hover:border-slate-700 hover:-translate-y-0.5"
+                          >
+                            {/* Number */}
+                            <div className={`mb-3 flex h-7 w-7 items-center justify-center rounded-lg border ${c.badge} text-xs font-bold`}>
+                              {String(itemIndex + 1).padStart(2, '0')}
+                            </div>
+                            <h4 className="mb-2 text-sm font-semibold text-white leading-snug">{item.title}</h4>
+                            <p className="text-xs text-slate-400 leading-relaxed">{item.desc}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Important Disclaimer */}
+            <div className="mt-12 reveal reveal-delay-3">
+              <div className="relative overflow-hidden rounded-3xl border border-slate-700/50 bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 p-6 sm:p-8">
+                <div className="pointer-events-none absolute right-0 top-0 h-40 w-40 translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-500/10 blur-3xl" />
+                <div className="flex items-start gap-4">
+                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border border-amber-500/30 bg-amber-500/10">
+                    <svg viewBox="0 0 24 24" className="h-5 w-5 text-amber-400" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-amber-300 uppercase tracking-wider">Important Disclaimer</p>
+                    <p className="mt-2 text-sm text-slate-400 leading-relaxed">
+                      AISHE is a <span className="text-slate-200 font-medium">software AI client-system</span> for task automation and assistance. It is <span className="text-slate-200 font-medium">not a financial product</span>, not an investment offer, and not a recommendation to invest. Any commercial or personal use is solely at the responsibility of the user. We strictly avoid any wording suggesting &ldquo;passive income,&rdquo; &ldquo;automatic profits,&rdquo; or &ldquo;guaranteed success.&rdquo;
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </section>
