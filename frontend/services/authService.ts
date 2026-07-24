@@ -12,6 +12,14 @@ export type RegisterRequest = {
   username: string;
   name?: string;
   referralCode?: string;
+  originDomain?: string;
+  eulaAccepted?: boolean;
+  distanceSalesAccepted?: boolean;
+  kvkkAccepted?: boolean;
+  wantsAffiliateProgram?: boolean;
+  wantsReferralProgram?: boolean;
+  gaicAccepted?: boolean;
+  gaicVersion?: string;
 };
 
 export type DemoLoginResponse = {

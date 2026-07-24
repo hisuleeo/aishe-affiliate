@@ -14,12 +14,16 @@ export type CreateOrderPayload = {
   aisheId?: string;
   selectedOptions?: string[];
   limitSize?: number;
+  useAisheeMoney?: boolean;
   needsInvoice?: boolean;
   invoiceInfo?: {
-    companyName: string;
-    taxNumber: string;
-    taxOffice: string;
-    address: string;
+    type?: 'corporate' | 'individual';
+    companyName?: string;
+    taxNumber?: string;
+    taxOffice?: string;
+    fullName?: string;
+    nationalId?: string;
+    address?: string;
   };
 };
 
@@ -34,5 +38,14 @@ export type UpdateOrderStatusPayload = {
 
 export const updateOrderStatus = async (id: string, payload: UpdateOrderStatusPayload) => {
   const response = await apiClient.patch<Order>(`/orders/${id}/status`, payload);
+  return response.data;
+};
+
+export type UpdateOrderLabelPayload = {
+  aisheLabel: string;
+};
+
+export const updateOrderLabel = async (id: string, payload: UpdateOrderLabelPayload) => {
+  const response = await apiClient.patch<Order>(`/orders/${id}`, payload);
   return response.data;
 };

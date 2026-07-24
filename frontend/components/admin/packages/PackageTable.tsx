@@ -4,11 +4,11 @@ import type { Package } from '@shared/types';
 import { deletePackage, getPackages } from '@/services/packageService';
 import { useToast } from '@/components/ui/ToastProvider';
 
-const formatCurrency = (amount: string, currency: string) => {
+const formatCurrency = (amount: string, _currency: string) => {
   const value = Number(amount);
-  return new Intl.NumberFormat('tr-TR', {
+  return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency,
+    currency: 'USD',
     maximumFractionDigits: 2,
   }).format(Number.isNaN(value) ? 0 : value);
 };
@@ -73,7 +73,7 @@ export function PackageTable({ onEdit }: PackageTableProps) {
             <span className={pkg.isActive ? 'text-emerald-400' : 'text-rose-400'}>
               {pkg.isActive ? 'Aktif' : 'Pasif'}
             </span>
-            <span>{pkg.currency}</span>
+            <span>USD</span>
             <div className="flex justify-end gap-2">
               <button
                 type="button"

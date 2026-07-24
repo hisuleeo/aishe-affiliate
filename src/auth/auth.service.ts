@@ -189,7 +189,7 @@ export class AuthService {
 
     // Affiliate link oluştur - basit kod: username'in kendisi
     const code = username;
-    const targetUrl = `https://app.aishe.pro/?ref=${code}`;
+    const targetUrl = `https://app.aishe.pro/ref/${code}`;
     
     // Aynı kod varsa skip et
     const existing = await this.prisma.affiliateLink.findUnique({ where: { code } });

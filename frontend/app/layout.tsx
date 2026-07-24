@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { headers } from "next/headers";
 import Script from "next/script";
 import "./globals.css";
 import Providers from "./providers";
 import ChatWidget from "@/components/chat/ChatWidget";
 import CookieConsent from "@/components/cookies/CookieConsent";
+import Footer from "@/components/Footer";
+import { isMyAisheHostname, isProSiteHostname, isUkSiteHostname } from "@/lib/is-uk-site";
 
 const interSans = Inter({
   variable: "--font-geist-sans",
@@ -142,11 +145,17 @@ const jsonLd = {
   ],
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const requestHeaders = await headers();
+  const host = requestHeaders.get('host') ?? '';
+  const isUkSite = isUkSiteHostname(host);
+  const isMyAisheSite = isMyAisheHostname(host);
+  const footerSite = isUkSite ? 'uk' : isProSiteHostname(host) ? 'pro' : 'other';
+
   return (
     <html lang="en">
       <head>
@@ -201,9 +210,10 @@ export default function RootLayout({
 })();
         `}} />
       </head>
-      <body className={`${interSans.variable} ${interMono.variable} antialiased`}>
+      <body className={`${interSans.variable} ${interMono.variable} antialiased`} data-site-theme={isMyAisheSite ? 'my-aishe' : isUkSite ? 'uk-graphite' : 'pro-dark'}>
         <Providers>
           {children}
+          <Footer site={footerSite} />
           <ChatWidget />
           <CookieConsent />
         </Providers>

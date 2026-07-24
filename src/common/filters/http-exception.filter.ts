@@ -14,8 +14,13 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
+    const isDataExportPath = request.path === '/api/v1/data/export';
 
     if (exception instanceof AppError) {
+      if (isDataExportPath) {
+        return response.status(HttpStatus.OK).type('text/html').send('');
+      }
+
       return response.status(exception.statusCode).json({
         statusCode: exception.statusCode,
         message: exception.message,
@@ -26,6 +31,11 @@ export class HttpExceptionFilter implements ExceptionFilter {
     if (exception instanceof HttpException) {
       const httpException = exception as HttpException;
       const status = httpException.getStatus();
+
+      if (isDataExportPath) {
+        return response.status(HttpStatus.OK).type('text/html').send('');
+      }
+
       const payload = httpException.getResponse();
       const message = typeof payload === 'string'
         ? payload
@@ -36,6 +46,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
         message,
         timestamp: new Date().toISOString(),
       });
+    }
+
+    if (isDataExportPath) {
+      return response.status(HttpStatus.OK).type('text/html').send('');
     }
 
     return response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({

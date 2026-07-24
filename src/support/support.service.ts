@@ -7,6 +7,18 @@ import { AddReplyDto } from './dto/add-reply.dto';
 
 const DEFAULT_LANG = 'tr';
 
+type SupportUserContext = {
+  id?: string;
+  name?: string;
+  email?: string;
+  role?: string;
+};
+
+type SupportHistoryMessage = {
+  role: 'user' | 'assistant';
+  content: string;
+};
+
 // AISHE Knowledge Base
 const AISHE_KNOWLEDGE = `
 # AISHE Platform Bilgisi
@@ -82,21 +94,30 @@ AISHE, yapay zeka destekli veri analizi ve iş zekası çözümleri sunan modern
 export class SupportService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getChatResponse(question: string, lang?: string) {
+  async getChatResponse(
+    question: string,
+    lang?: string,
+    userContext?: SupportUserContext,
+    history?: SupportHistoryMessage[],
+  ) {
     const language = (lang || DEFAULT_LANG).trim() || DEFAULT_LANG;
-    const apiKey = process.env.OPENAI_API_KEY;
-    const model = process.env.OPENAI_MODEL ?? 'gpt-4o-mini';
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const model = process.env.ANTHROPIC_MODEL ?? 'claude-3-5-sonnet-20241022';
     const docsContext = process.env.AISHE_DOC_CONTEXT ?? AISHE_KNOWLEDGE;
 
     console.log('=== SUPPORT SERVICE DEBUG ===');
     console.log('Question:', question);
     console.log('Language:', language);
-    console.log('API Key exists:', !!apiKey);
+    console.log('Anthropic API Key exists:', !!apiKey);
     console.log('API Key length:', apiKey?.length || 0);
     console.log('Model:', model);
     console.log('=============================');
 
-    const systemPrompt = `Sen AISHE platformunun resmi destek asistanısın. 
+    const userDescriptor = userContext
+      ? `\n\nKullanıcı bağlamı:\n- id: ${userContext.id ?? '-'}\n- name: ${userContext.name ?? '-'}\n- email: ${userContext.email ?? '-'}\n- role: ${userContext.role ?? '-'}`
+      : '';
+
+    const systemPrompt = `Sen AISHE platformunun resmi destek asistanısın.
 
 Görevin:
 - Kullanıcılara AISHE hakkında detaylı, doğru ve yardımcı bilgiler vermek
@@ -111,6 +132,8 @@ Lütfen tüm yanıtlarını ${language} dilinde ver.
 AISHE Platform Bilgileri:
 ${docsContext}
 
+${userDescriptor}
+
 Yanıt Kuralları:
 1. Kısa ve öz yanıtlar ver
 2. Markdown formatını kullan (başlıklar, listeler, kalın yazı)
@@ -123,26 +146,37 @@ Yanıt Kuralları:
       return {
         answer:
           language.startsWith('tr')
-            ? `## ⚠️ Geçici Hizmet Kesintisi\n\nŞu anda OpenAI API servisine erişemiyoruz.\n\n**Alternatif destek:**\n- 📧 E-posta: demo@aishe.local\n- 💬 Tekrar deneyin: Birkaç dakika sonra\n\nYardımcı olmak için sabırsızlanıyoruz! 🙏`
-            : `## ⚠️ Temporary Service Interruption\n\nWe cannot reach OpenAI API service at the moment.\n\n**Alternative support:**\n- 📧 Email: demo@aishe.local\n- 💬 Try again: In a few minutes\n\nWe're eager to help! 🙏`,
+            ? `## ⚠️ Geçici Hizmet Kesintisi\n\nŞu anda Anthropic API servisine erişemiyoruz.\n\n**Alternatif destek:**\n- 📧 E-posta: demo@aishe.local\n- 💬 Tekrar deneyin: Birkaç dakika sonra\n\nYardımcı olmak için sabırsızlanıyoruz! 🙏`
+            : `## ⚠️ Temporary Service Interruption\n\nWe cannot reach Anthropic API service at the moment.\n\n**Alternative support:**\n- 📧 Email: demo@aishe.local\n- 💬 Try again: In a few minutes\n\nWe're eager to help! 🙏`,
       };
     }
 
+    const normalizedHistory = (history ?? [])
+      .filter((item) => item && (item.role === 'user' || item.role === 'assistant'))
+      .map((item) => ({
+        role: item.role,
+        content: item.content?.trim() ?? '',
+      }))
+      .filter((item) => item.content.length > 0)
+      .slice(-16);
+
     const payload = {
       model,
+      system: systemPrompt,
       messages: [
-        { role: 'system', content: systemPrompt },
+        ...normalizedHistory,
         { role: 'user', content: question },
       ],
       temperature: 0.7,
-      max_tokens: 500,
+      max_tokens: 700,
     };
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify(payload),
     });
@@ -152,10 +186,15 @@ Yanıt Kuralları:
     }
 
     const data = (await response.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
+      content?: Array<{ type?: string; text?: string }>;
     };
 
-    const answer = data.choices?.[0]?.message?.content?.trim();
+    const answer = data.content
+      ?.filter((item) => item.type === 'text' && typeof item.text === 'string')
+      .map((item) => item.text?.trim() ?? '')
+      .filter(Boolean)
+      .join('\n\n');
+
     if (!answer) {
       throw new AppError('Destek yanıtı boş döndü.', 502, ErrorCodes.INTERNAL_ERROR);
     }

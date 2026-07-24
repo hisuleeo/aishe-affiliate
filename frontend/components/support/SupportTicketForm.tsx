@@ -1,208 +1,352 @@
 "use client";
 
-import { useState } from 'react';
-import { MessageCircle, Send, CheckCircle2 } from 'lucide-react';
-import { sendSupportQuestion, getPreferredLanguage } from '@/services/supportService';
+import { useEffect, useState, useCallback } from 'react';
+import {
+  MessageCircle, Send, CheckCircle2, Clock, ArrowLeft, Plus,
+  Loader2, AlertCircle, ChevronRight, Inbox, User, Shield,
+} from 'lucide-react';
+import {
+  createTicket, getMyTickets, getTicketById, addReplyToTicket,
+  type SupportTicket, type SupportTicketReply, type CreateTicketPayload,
+} from '@/services/supportService';
 import { useAuth } from '@/components/auth/useAuth';
 import { useToast } from '@/components/ui/ToastProvider';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 
-type SupportTicket = {
-  id: string;
-  subject: string;
-  message: string;
-  createdAt: string;
-  status: 'open' | 'resolved';
-  answer?: string;
+const STATUS_MAP: Record<string, { label: string; color: string; icon: typeof Clock }> = {
+  OPEN:        { label: 'Open',        color: 'bg-blue-500/10 text-blue-300 border-blue-500/30',    icon: Clock },
+  IN_PROGRESS: { label: 'In Progress', color: 'bg-amber-500/10 text-amber-300 border-amber-500/30', icon: Loader2 },
+  WAITING:     { label: 'Waiting',     color: 'bg-purple-500/10 text-purple-300 border-purple-500/30', icon: Clock },
+  RESOLVED:    { label: 'Resolved',    color: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30', icon: CheckCircle2 },
+  CLOSED:      { label: 'Closed',      color: 'bg-slate-500/10 text-slate-400 border-slate-600/30', icon: AlertCircle },
 };
 
-export function SupportTicketForm() {
+const PRIORITY_MAP: Record<string, { label: string; color: string }> = {
+  LOW:    { label: 'Low',    color: 'text-slate-400' },
+  MEDIUM: { label: 'Medium', color: 'text-blue-400' },
+  HIGH:   { label: 'High',   color: 'text-orange-400' },
+  URGENT: { label: 'Urgent', color: 'text-rose-400' },
+};
+
+const fmtDate = (d: string) =>
+  new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+type View = 'list' | 'create' | 'detail';
+
+export function SupportTicketForm({ neutralMode = false }: { neutralMode?: boolean }) {
   const { user } = useAuth();
   const { showToast } = useToast();
+
+  const [view, setView] = useState<View>('list');
+  const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
+
+  // Create form
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
+  const [category, setCategory] = useState<CreateTicketPayload['category']>('GENERAL');
+  const [priority, setPriority] = useState<CreateTicketPayload['priority']>('MEDIUM');
   const [sending, setSending] = useState(false);
-  const [tickets, setTickets] = useState<SupportTicket[]>([]);
 
-  const handleSubmit = async () => {
+  // Reply
+  const [reply, setReply] = useState('');
+  const [replying, setReplying] = useState(false);
+
+  const fetchTickets = useCallback(async () => {
+    try {
+      const data = await getMyTickets();
+      setTickets(data);
+    } catch {
+      /* ignore */
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchTickets(); }, [fetchTickets]);
+
+  const openTicketDetail = async (ticketId: string) => {
+    try {
+      const detail = await getTicketById(ticketId);
+      setSelectedTicket(detail);
+      setView('detail');
+    } catch {
+      showToast({ title: 'Could not load ticket details', variant: 'error' });
+    }
+  };
+
+  const handleCreate = async () => {
     if (!subject.trim() || !message.trim()) {
-      showToast({ title: 'Lütfen konu ve mesajı doldurun', variant: 'error' });
+      showToast({ title: 'Please fill in the subject and message', variant: 'error' });
       return;
     }
-
     setSending(true);
     try {
-      const response = await sendSupportQuestion(
-        message.trim(), 
-        getPreferredLanguage(),
-        {
-          id: user?.id,
-          name: user?.name ?? undefined,
-          email: user?.email ?? undefined,
-          role: user?.role
-        }
-      );
-
-      const newTicket: SupportTicket = {
-        id: `ticket-${Date.now()}`,
-        subject: subject.trim(),
-        message: message.trim(),
-        createdAt: new Date().toISOString(),
-        status: 'resolved',
-        answer: response.answer,
-      };
-
-      setTickets((prev) => [newTicket, ...prev]);
-      setSubject('');
-      setMessage('');
-      showToast({ title: 'Destek talebi gönderildi', variant: 'success' });
+      await createTicket({ subject: subject.trim(), description: message.trim(), category, priority });
+      showToast({ title: 'Support ticket created', variant: 'success' });
+      setSubject(''); setMessage(''); setCategory('GENERAL'); setPriority('MEDIUM');
+      setView('list');
+      await fetchTickets();
     } catch {
-      showToast({
-        title: 'Destek talebi gönderilemedi',
-        description: 'Lütfen daha sonra tekrar deneyin.',
-        variant: 'error',
-      });
+      showToast({ title: 'Could not create support ticket', variant: 'error' });
     } finally {
       setSending(false);
     }
   };
 
-  return (
-    <div className="space-y-6">
-      {/* Form */}
-      <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-slate-900/50 to-slate-800/30 p-8 backdrop-blur-xl">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-500">
-            <MessageCircle className="h-5 w-5 text-white" />
-          </div>
+  const handleReply = async () => {
+    if (!selectedTicket || !reply.trim()) return;
+    setReplying(true);
+    try {
+      await addReplyToTicket(selectedTicket.id, reply.trim());
+      showToast({ title: 'Message sent', variant: 'success' });
+      setReply('');
+      const detail = await getTicketById(selectedTicket.id);
+      setSelectedTicket(detail);
+      await fetchTickets();
+    } catch {
+      showToast({ title: 'Could not send message', variant: 'error' });
+    } finally {
+      setReplying(false);
+    }
+  };
+
+  /* ═══════════ LIST VIEW ═══════════ */
+  if (view === 'list') {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-white">Yeni Destek Talebi Oluştur</h3>
-            <p className="text-sm text-slate-400">Sorularınız için bize ulaşın</p>
+            <h3 className="text-lg font-semibold text-white">Your Support Tickets</h3>
+            <p className="text-sm text-slate-400">Track your tickets and view replies</p>
           </div>
+          <button onClick={() => setView('create')}
+            className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-lg transition-all active:scale-[0.98] ${neutralMode ? 'bg-[#4b5563] shadow-black/25 hover:bg-[#5b6472]' : 'bg-gradient-to-r from-cyan-600 to-blue-600 shadow-cyan-500/15 hover:shadow-cyan-500/30 hover:brightness-110'}`}>
+            <Plus className="h-4 w-4" /> New Ticket
+          </button>
         </div>
 
-        <div className="space-y-4">
-          <div>
-            <label className="text-xs font-medium text-slate-300 flex items-center gap-1 mb-2">
-              <MessageCircle className="h-3.5 w-3.5" />
-              Konu
-            </label>
-            <input
-              type="text"
-              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-indigo-500/50 focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              placeholder="Örn: Paket süresi uzatma hakkında"
-            />
+        {loading && (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="h-8 w-8 animate-spin text-cyan-400" />
           </div>
-          <div>
-            <label className="text-xs font-medium text-slate-300 flex items-center gap-1 mb-2">
-              <MessageCircle className="h-3.5 w-3.5" />
-              Mesajınız
-            </label>
-            <textarea
-              className="w-full h-32 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-indigo-500/50 focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all resize-none"
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              placeholder="Detayları paylaşın, size daha iyi yardımcı olalım..."
-            />
+        )}
+
+        {!loading && tickets.length === 0 && (
+          <div className="rounded-2xl border border-slate-700/30 bg-slate-800/20 p-12 text-center">
+            <Inbox className="mx-auto h-12 w-12 text-slate-600" />
+            <p className="mt-4 text-slate-400">You don&apos;t have any support tickets yet</p>
+            <button onClick={() => setView('create')}
+              className={`mt-4 inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm transition ${neutralMode ? 'bg-white/8 border-white/16 text-slate-200 hover:bg-white/12' : 'bg-cyan-500/10 border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/20'}`}>
+              <Plus className="h-4 w-4" /> Create your first ticket
+            </button>
+          </div>
+        )}
+
+        {!loading && tickets.length > 0 && (
+          <div className="space-y-2">
+            {tickets.map((t) => {
+              const st = STATUS_MAP[t.status] ?? STATUS_MAP.OPEN;
+              const replyCount = t.replies?.length ?? 0;
+              const hasStaffReply = t.replies?.some((r) => r.isStaff) ?? false;
+              return (
+                <button key={t.id} type="button" onClick={() => openTicketDetail(t.id)}
+                  className="group flex w-full items-center gap-4 rounded-xl border border-slate-700/30 bg-slate-800/20 p-4 text-left transition-all hover:border-cyan-500/20 hover:bg-cyan-500/5">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-700/30 bg-slate-800/40">
+                    <MessageCircle className="h-5 w-5 text-slate-400" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="truncate text-sm font-semibold text-white">{t.subject}</p>
+                      {hasStaffReply && (
+                        <span className="shrink-0 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium text-emerald-400 border border-emerald-500/30">
+                          Replied
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-0.5 truncate text-xs text-slate-500">
+                      {fmtDate(t.createdAt)}
+                      {replyCount > 0 && <span className="ml-2">· {replyCount} messages</span>}
+                    </p>
+                  </div>
+                  <span className={`shrink-0 rounded-lg border px-2.5 py-1 text-[11px] font-medium ${st.color}`}>
+                    {st.label}
+                  </span>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-slate-600 transition-transform group-hover:translate-x-0.5 group-hover:text-slate-400" />
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  /* ═══════════ CREATE VIEW ═══════════ */
+  if (view === 'create') {
+    return (
+      <div className="space-y-6">
+        <button onClick={() => setView('list')}
+          className="flex items-center gap-2 text-sm text-slate-400 transition hover:text-white">
+          <ArrowLeft className="h-4 w-4" /> Go back
+        </button>
+
+        <div className="rounded-2xl border border-slate-700/30 bg-slate-800/20 p-6 backdrop-blur-xl">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 shadow-lg shadow-cyan-500/15">
+              <MessageCircle className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-white">New Support Ticket</h3>
+              <p className="text-sm text-slate-400">Our team will respond as soon as possible</p>
+            </div>
           </div>
 
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={sending}
-              className="group relative overflow-hidden rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 px-8 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition-all hover:shadow-xl hover:shadow-indigo-500/40 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-            >
-              <span className="relative z-10 flex items-center gap-2">
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs font-medium text-slate-300 mb-1.5 block">Subject</label>
+              <input type="text" value={subject} onChange={(e) => setSubject(e.target.value)}
+                placeholder="E.g.: About package extension"
+                className="w-full rounded-xl border border-slate-700/40 bg-slate-800/30 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-cyan-500/50 focus:outline-none focus:ring-2 focus:ring-cyan-500/15 transition-all" />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-slate-300 mb-1.5 block">Category</label>
+                <select value={category} onChange={(e) => setCategory(e.target.value as CreateTicketPayload['category'])}
+                  className="w-full rounded-xl border border-slate-700/40 bg-slate-800/30 px-4 py-3 text-sm text-white focus:border-cyan-500/50 focus:outline-none focus:ring-2 focus:ring-cyan-500/15 transition-all">
+                  <option value="GENERAL">General</option>
+                  <option value="TECHNICAL">Technical</option>
+                  <option value="BILLING">Billing</option>
+                  <option value="ACCOUNT">Account</option>
+                  <option value="FEATURE_REQUEST">Feature Request</option>
+                  <option value="BUG_REPORT">Bug Report</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-300 mb-1.5 block">Priority</label>
+                <select value={priority} onChange={(e) => setPriority(e.target.value as CreateTicketPayload['priority'])}
+                  className="w-full rounded-xl border border-slate-700/40 bg-slate-800/30 px-4 py-3 text-sm text-white focus:border-cyan-500/50 focus:outline-none focus:ring-2 focus:ring-cyan-500/15 transition-all">
+                  <option value="LOW">Low</option>
+                  <option value="MEDIUM">Medium</option>
+                  <option value="HIGH">High</option>
+                  <option value="URGENT">Urgent</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-slate-300 mb-1.5 block">Your Message</label>
+              <textarea value={message} onChange={(e) => setMessage(e.target.value)}
+                placeholder="Share the details so we can help you better..."
+                rows={5}
+                className="w-full rounded-xl border border-slate-700/40 bg-slate-800/30 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-cyan-500/50 focus:outline-none focus:ring-2 focus:ring-cyan-500/15 transition-all resize-none" />
+            </div>
+
+            <div className="flex justify-end">
+              <button type="button" onClick={handleCreate} disabled={sending}
+                className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-cyan-500/15 transition-all hover:shadow-cyan-500/30 hover:brightness-110 disabled:opacity-50 active:scale-[0.98]">
                 {sending ? (
-                  <>
-                    <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <span>Gönderiliyor...</span>
-                  </>
+                  <><Loader2 className="h-4 w-4 animate-spin" /> Sending...</>
                 ) : (
-                  <>
-                    <Send className="h-4 w-4" />
-                    <span>Talep Gönder</span>
-                  </>
+                  <><Send className="h-4 w-4" /> Submit Ticket</>
                 )}
-              </span>
-              <div className="absolute inset-0 -z-10 bg-gradient-to-r from-indigo-600 to-purple-600 opacity-0 transition-opacity group-hover:opacity-100" />
-            </button>
+              </button>
+            </div>
           </div>
         </div>
       </div>
+    );
+  }
 
-      {/* Tickets List */}
-      {tickets.length > 0 && (
-        <div className="space-y-4">
-          <h3 className="text-sm font-semibold text-slate-300">Destek Talepleriniz</h3>
-          {tickets.map((ticket) => (
-            <div
-              key={ticket.id}
-              className="rounded-2xl border border-white/10 bg-gradient-to-br from-slate-900/50 to-slate-800/30 p-6 backdrop-blur-xl"
-            >
-              <div className="flex items-start justify-between gap-4 mb-4">
-                <div>
-                  <h4 className="font-semibold text-white">{ticket.subject}</h4>
-                  <p className="text-xs text-slate-400 mt-1">
-                    {new Date(ticket.createdAt).toLocaleDateString('tr-TR', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
+  /* ═══════════ DETAIL VIEW ═══════════ */
+  if (view === 'detail' && selectedTicket) {
+    const st = STATUS_MAP[selectedTicket.status] ?? STATUS_MAP.OPEN;
+    const pr = PRIORITY_MAP[selectedTicket.priority] ?? PRIORITY_MAP.MEDIUM;
+    const isClosed = selectedTicket.status === 'CLOSED' || selectedTicket.status === 'RESOLVED';
+    const allMessages: Array<{ type: 'initial' | 'reply'; date: string; content: string; isStaff: boolean; name: string }> = [
+      { type: 'initial', date: selectedTicket.createdAt, content: selectedTicket.description, isStaff: false, name: user?.name ?? 'Me' },
+      ...(selectedTicket.replies ?? []).map((r) => ({
+        type: 'reply' as const,
+        date: r.createdAt,
+        content: r.message,
+        isStaff: r.isStaff,
+        name: r.isStaff ? (r.user?.name ?? 'Support Team') : (r.user?.name ?? 'Me'),
+      })),
+    ];
+
+    return (
+      <div className="space-y-4">
+        <button onClick={() => { setView('list'); setSelectedTicket(null); }}
+          className="flex items-center gap-2 text-sm text-slate-400 transition hover:text-white">
+          <ArrowLeft className="h-4 w-4" /> Go back
+        </button>
+
+        <div className="rounded-2xl border border-slate-700/30 bg-slate-800/20 p-5">
+          <h3 className="text-lg font-semibold text-white">{selectedTicket.subject}</h3>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span className={`rounded-lg border px-2.5 py-1 text-[11px] font-medium ${st.color}`}>{st.label}</span>
+            <span className={`text-[11px] font-medium ${pr.color}`}>● {pr.label} priority</span>
+            <span className="text-[11px] text-slate-500">{fmtDate(selectedTicket.createdAt)}</span>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {allMessages.map((m, i) => (
+            <div key={i} className={`flex gap-3 ${m.isStaff ? 'justify-start' : 'justify-end'}`}>
+              {m.isStaff && (
+                <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-cyan-500/25 bg-gradient-to-br from-cyan-500/15 to-indigo-500/15">
+                  <Shield className="h-4 w-4 text-cyan-400" />
+                </div>
+              )}
+              <div className={m.isStaff ? 'max-w-[85%]' : 'max-w-[85%]'}>
+                <div className={`rounded-2xl px-4 py-3 ${
+                  m.isStaff
+                    ? 'rounded-tl-md border border-slate-700/30 bg-slate-800/30'
+                    : neutralMode
+                      ? 'rounded-tr-md bg-[#4b5563] text-white shadow-lg shadow-black/20'
+                      : 'rounded-tr-md bg-gradient-to-br from-cyan-600 to-blue-600 text-white shadow-lg shadow-cyan-500/10'
+                }`}>
+                  <p className={`text-sm leading-relaxed whitespace-pre-wrap ${m.isStaff ? 'text-slate-200' : 'text-white'}`}>
+                    {m.content}
                   </p>
                 </div>
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-400">
-                  <CheckCircle2 className="h-3 w-3" />
-                  {ticket.status === 'resolved' ? 'Yanıtlandı' : 'Açık'}
-                </span>
+                <p className={`mt-1 text-[10px] text-slate-600 ${m.isStaff ? '' : 'text-right'}`}>
+                  {m.isStaff && <span className="text-cyan-500/70 font-medium">Support Team · </span>}
+                  {fmtDate(m.date)}
+                </p>
               </div>
-
-              <div className="space-y-4">
-                <div className="rounded-xl bg-white/5 p-4 border-l-2 border-indigo-500">
-                  <p className="text-xs font-medium text-slate-400 mb-2">Mesajınız:</p>
-                  <p className="text-sm text-slate-200">{ticket.message}</p>
+              {!m.isStaff && (
+                <div className={`mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border text-sm font-bold ${neutralMode ? 'border-white/18 bg-white/10 text-slate-200' : 'border-cyan-500/25 bg-gradient-to-br from-cyan-500/15 to-teal-500/15 text-cyan-300'}`}>
+                  {user?.name?.[0]?.toUpperCase() ?? <User className="h-4 w-4" />}
                 </div>
-
-                {ticket.answer && (
-                  <div className="rounded-xl bg-gradient-to-br from-emerald-500/10 to-cyan-500/10 p-4 border-l-2 border-emerald-500">
-                    <p className="text-xs font-medium text-emerald-400 mb-2">AISHE Destek Yanıtı:</p>
-                    <div className="prose prose-sm prose-invert max-w-none">
-                      <ReactMarkdown 
-                        remarkPlugins={[remarkGfm]}
-                        components={{
-                          h1: ({node, ...props}) => <h1 className="text-lg font-bold text-white mt-4 mb-2" {...props} />,
-                          h2: ({node, ...props}) => <h2 className="text-base font-bold text-white mt-3 mb-2" {...props} />,
-                          h3: ({node, ...props}) => <h3 className="text-sm font-semibold text-white mt-2 mb-1" {...props} />,
-                          p: ({node, ...props}) => <p className="text-sm text-slate-200 mb-2" {...props} />,
-                          ul: ({node, ...props}) => <ul className="list-disc list-inside space-y-1 text-sm text-slate-200 mb-2" {...props} />,
-                          ol: ({node, ...props}) => <ol className="list-decimal list-inside space-y-1 text-sm text-slate-200 mb-2" {...props} />,
-                          li: ({node, ...props}) => <li className="text-slate-200" {...props} />,
-                          strong: ({node, ...props}) => <strong className="font-semibold text-white" {...props} />,
-                          code: ({node, inline, ...props}: any) => 
-                            inline ? 
-                              <code className="rounded bg-slate-800 px-1.5 py-0.5 text-xs text-cyan-400" {...props} /> :
-                              <code className="block rounded-lg bg-slate-900 p-3 text-xs text-slate-200 overflow-x-auto" {...props} />
-                        }}
-                      >
-                        {ticket.answer}
-                      </ReactMarkdown>
-                    </div>
-                  </div>
-                )}
-              </div>
+              )}
             </div>
           ))}
         </div>
-      )}
-    </div>
-  );
+
+        {!isClosed ? (
+          <div className="rounded-2xl border border-slate-700/30 bg-slate-800/20 p-4">
+            <div className="flex items-end gap-2">
+              <textarea value={reply} onChange={(e) => setReply(e.target.value)}
+                placeholder="Type your message..."
+                rows={3}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleReply(); } }}
+                className={`flex-1 rounded-xl border border-slate-700/40 bg-slate-800/30 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:outline-none transition-all resize-none ${neutralMode ? 'focus:border-white/30 focus:ring-2 focus:ring-white/10' : 'focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/15'}`} />
+              <button type="button" onClick={handleReply} disabled={!reply.trim() || replying}
+                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white shadow-lg transition-all disabled:opacity-30 active:scale-95 ${neutralMode ? 'bg-[#4b5563] shadow-black/25 hover:bg-[#5b6472]' : 'bg-gradient-to-r from-cyan-500 to-blue-600 shadow-cyan-500/15 hover:shadow-cyan-500/30 hover:brightness-110'}`}>
+                {replying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-slate-700/30 bg-slate-800/20 p-4 text-center text-sm text-slate-500">
+            This ticket has been closed. You can create a new ticket.
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return null;
 }

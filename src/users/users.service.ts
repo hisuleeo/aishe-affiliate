@@ -60,7 +60,22 @@ export class UsersService {
       throw new AppError('Kullanıcı bulunamadı.', 404, ErrorCodes.USER_NOT_FOUND);
     }
 
-    return user;
+    const [affiliatePref, referralPref] = await Promise.all([
+      this.prisma.systemSetting.findUnique({
+        where: { key: `user:${userId}:wantsAffiliateProgram` },
+      }),
+      this.prisma.systemSetting.findUnique({
+        where: { key: `user:${userId}:wantsReferralProgram` },
+      }),
+    ]);
+
+    return {
+      ...user,
+      wantsAffiliateProgram: affiliatePref
+        ? affiliatePref.value === 'true'
+        : user.roles.some((r) => r.role === UserRoleType.AFFILIATE),
+      wantsReferralProgram: referralPref ? referralPref.value === 'true' : false,
+    };
   }
 
   async create(payload: CreateUserDto): Promise<User> {
@@ -105,7 +120,15 @@ export class UsersService {
     });
   }
 
-  async updateProfile(id: string, payload: { name?: string; username?: string }) {
+  async updateProfile(
+    id: string,
+    payload: {
+      name?: string;
+      username?: string;
+      wantsAffiliateProgram?: boolean;
+      wantsReferralProgram?: boolean;
+    },
+  ) {
     await this.getById(id);
     const normalizedUsername = payload.username ? this.normalizeUsername(payload.username) : undefined;
     if (normalizedUsername) {
@@ -115,10 +138,44 @@ export class UsersService {
       }
     }
 
-    const updated = await this.usersRepository.update(id, {
+    await this.usersRepository.update(id, {
       name: payload.name,
       username: normalizedUsername,
     });
+
+    if (typeof payload.wantsAffiliateProgram === 'boolean') {
+      await this.prisma.systemSetting.upsert({
+        where: { key: `user:${id}:wantsAffiliateProgram` },
+        update: {
+          value: String(payload.wantsAffiliateProgram),
+          type: 'boolean',
+          category: 'user-preferences',
+        },
+        create: {
+          key: `user:${id}:wantsAffiliateProgram`,
+          value: String(payload.wantsAffiliateProgram),
+          type: 'boolean',
+          category: 'user-preferences',
+        },
+      });
+    }
+
+    if (typeof payload.wantsReferralProgram === 'boolean') {
+      await this.prisma.systemSetting.upsert({
+        where: { key: `user:${id}:wantsReferralProgram` },
+        update: {
+          value: String(payload.wantsReferralProgram),
+          type: 'boolean',
+          category: 'user-preferences',
+        },
+        create: {
+          key: `user:${id}:wantsReferralProgram`,
+          value: String(payload.wantsReferralProgram),
+          type: 'boolean',
+          category: 'user-preferences',
+        },
+      });
+    }
 
     // Sync referral code and affiliate links when username changes
     if (normalizedUsername) {
@@ -148,20 +205,20 @@ export class UsersService {
             where: { id: link.id },
             data: {
               code: newCode,
-              targetUrl: `https://app.aishe.pro/?ref=${normalizedUsername}`,
+              targetUrl: `https://app.aishe.pro/ref/${normalizedUsername}`,
             },
           });
         } else {
           // Just update the targetUrl even if code can't change
           await this.prisma.affiliateLink.update({
             where: { id: link.id },
-            data: { targetUrl: `https://app.aishe.pro/?ref=${normalizedUsername}` },
+            data: { targetUrl: `https://app.aishe.pro/ref/${normalizedUsername}` },
           });
         }
       }
     }
 
-    return this.sanitizeUser(updated as User & { roles: UserRole[] });
+    return this.getProfile(id);
   }
 
   async remove(id: string): Promise<User> {
@@ -170,13 +227,22 @@ export class UsersService {
   }
 
   async getOrCreateReferralCode(userId: string) {
+    const user = await this.usersRepository.findById(userId);
     const existing = await this.prisma.referralCode.findFirst({ where: { userId } });
     if (existing) {
+      if (user?.username && existing.code !== user.username) {
+        const taken = await this.prisma.referralCode.findUnique({ where: { code: user.username } });
+        if (!taken || taken.userId === userId) {
+          return this.prisma.referralCode.update({
+            where: { id: existing.id },
+            data: { code: user.username },
+          });
+        }
+      }
       return existing;
     }
 
-    // Use username as referral code (falls back to AISHE-XXXXX if no username)
-    const user = await this.usersRepository.findById(userId);
+    // Use username as referral code (falls back only if username is missing)
     let code: string;
     if (user?.username) {
       const taken = await this.prisma.referralCode.findUnique({ where: { code: user.username } });
@@ -325,10 +391,7 @@ export class UsersService {
       throw new AppError('Kullanıcı bulunamadı.', 404, ErrorCodes.USER_NOT_FOUND);
     }
     const username = await this.ensureUsername(user);
-    const targetUrl = payload.targetUrl.trim();
-    if (!targetUrl) {
-      throw new AppError('Hedef URL boş olamaz.', 400, ErrorCodes.INTERNAL_ERROR);
-    }
+    const targetUrl = `https://app.aishe.pro/ref/${username}`;
 
     const program = await this.prisma.program.findFirst({
       where: { status: 'active' },
@@ -339,7 +402,7 @@ export class UsersService {
       throw new AppError('Aktif program bulunamadı.', 400, ErrorCodes.INTERNAL_ERROR);
     }
 
-  const code = await this.generateAffiliateCode(username);
+    const code = await this.generateAffiliateCode(username);
     return this.prisma.affiliateLink.create({
       data: {
         affiliate: { connect: { id: userId } },
@@ -367,7 +430,7 @@ export class UsersService {
   private async generateAffiliateCode(username: string): Promise<string> {
     const base = username.toLowerCase();
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      const suffix = attempt === 0 ? '' : `-${Math.random().toString(36).substring(2, 6)}`;
+      const suffix = attempt === 0 ? '' : `_${Math.random().toString(36).substring(2, 6)}`;
       const code = `${base}${suffix}`;
       const exists = await this.prisma.affiliateLink.findUnique({ where: { code } });
       if (!exists) {

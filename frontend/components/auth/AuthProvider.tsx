@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 export type UserRole = 'admin' | 'affiliate' | 'user';
 
@@ -22,6 +22,35 @@ type AuthContextValue = {
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+
+function resolveCookieDomain(hostname: string): string | null {
+  const host = hostname.toLowerCase();
+  if (host.endsWith('.aishe.pro')) return '.aishe.pro';
+  if (host.endsWith('.aishe.uk')) return '.aishe.uk';
+  return null;
+}
+
+function setAuthTokenCookie(token: string) {
+  if (typeof document === 'undefined') return;
+  const domain = resolveCookieDomain(window.location.hostname);
+  const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+  const base = `auth_token=${encodeURIComponent(token)}; Path=/; SameSite=Lax${secure}`;
+  document.cookie = base;
+  if (domain) {
+    document.cookie = `${base}; Domain=${domain}`;
+  }
+}
+
+function clearAuthTokenCookie() {
+  if (typeof document === 'undefined') return;
+  const domain = resolveCookieDomain(window.location.hostname);
+  const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+  const base = `auth_token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax${secure}`;
+  document.cookie = base;
+  if (domain) {
+    document.cookie = `${base}; Domain=${domain}`;
+  }
+}
 
 // Mock/stub auth provider (API entegrasyonu yerine localStorage okur)
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -54,6 +83,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     window.localStorage.setItem('auth_token', token);
     window.localStorage.setItem('auth_role', nextUser.role);
     window.localStorage.setItem('auth_user', JSON.stringify(nextUser));
+    setAuthTokenCookie(token);
     setUser(nextUser);
   }, []);
 
@@ -61,6 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     window.localStorage.removeItem('auth_token');
     window.localStorage.removeItem('auth_role');
     window.localStorage.removeItem('auth_user');
+    clearAuthTokenCookie();
     setUser(null);
   }, []);
 
@@ -86,6 +117,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }),
     [isLoading, user],
   );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const token = window.localStorage.getItem('auth_token');
+    if (!token) return;
+    setAuthTokenCookie(token);
+  }, []);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

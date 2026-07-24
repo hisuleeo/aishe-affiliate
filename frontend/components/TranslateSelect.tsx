@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { AISHE_GOOGLANG_EVENT, getGoogTransLang } from '@/lib/goog-trans-lang';
 
 type LanguageOption = {
   code: string;
@@ -27,18 +28,12 @@ const LANGUAGE_OPTIONS: LanguageOption[] = [
 
 const SOURCE_LANGUAGE = 'en';
 
-function getGoogTransLang(): string {
-  if (typeof document === 'undefined') return SOURCE_LANGUAGE;
-  const match = document.cookie.match(/googtrans=\/[^/]+\/([^;]+)/);
-  return match?.[1] || SOURCE_LANGUAGE;
-}
-
 function setGoogTransCookies(lang: string) {
   if (typeof document === 'undefined') return;
   const val = `/${SOURCE_LANGUAGE}/${lang}`;
-  // Ana domain ve tüm path'ler için cookie set et
+      // Set translation cookie for apex domain and all paths
   document.cookie = `googtrans=${val}; path=/; SameSite=Lax`;
-  // Alt domain cookie'sini de set et
+  // Mirror cookie on parent domain for subdomains
   const host = window.location.hostname;
   const rootDomain = host.split('.').slice(-2).join('.');
   document.cookie = `googtrans=${val}; path=/; domain=.${rootDomain}; SameSite=Lax`;
@@ -61,10 +56,18 @@ function triggerGoogleTranslate(lang: string): boolean {
 }
 
 export default function TranslateSelect() {
+  return <TranslateSelectInner compact={false} />;
+}
+
+export function CompactTranslateSelect() {
+  return <TranslateSelectInner compact={true} />;
+}
+
+function TranslateSelectInner({ compact }: { compact: boolean }) {
   const [selected, setSelected] = useState(SOURCE_LANGUAGE);
   const isInitialized = useRef(false);
 
-  // Mount'ta cookie'den oku
+  // Read language from cookie on mount
   useEffect(() => {
     const lang = getGoogTransLang();
     setSelected(lang);
@@ -74,25 +77,26 @@ export default function TranslateSelect() {
   const handleChange = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
     const lang = event.target.value;
     setSelected(lang);
+    window.dispatchEvent(new CustomEvent(AISHE_GOOGLANG_EVENT, { detail: lang }));
 
-    // İngilizce'ye (varsayılan dil) dönüyorsa cookie'yi temizle
+    // Switching back to English: clear cookies and reload clean
     if (lang === SOURCE_LANGUAGE) {
       clearGoogTransCookies();
-      // Google Translate frame'ini kaldır
+      // Hide Google Translate banner frame
       const frame = document.querySelector('.goog-te-banner-frame');
       if (frame) (frame as HTMLElement).style.display = 'none';
-      // Sayfayı reload et (temiz İngilizce)
+      // Full reload for a clean English document
       window.location.reload();
       return;
     }
 
-    // Cookie'yi set et
+    // Persist language choice
     setGoogTransCookies(lang);
 
-    // Google Translate combo'sunu tetiklemeyi dene
+    // Try to drive the injected Google Translate <select>
     if (triggerGoogleTranslate(lang)) return;
 
-    // Combo henüz yüklenmemişse biraz bekle, yine olmazsa reload
+    // Widget may load late — retry, then reload once cookie is set
     let attempts = 0;
     const interval = window.setInterval(() => {
       attempts++;
@@ -102,23 +106,34 @@ export default function TranslateSelect() {
       }
       if (attempts >= 5) {
         window.clearInterval(interval);
-        // Cookie set edildi, reload ile Google Translate otomatik çalışır
+        // Cookie is set; hard reload lets GT pick it up
         window.location.reload();
       }
     }, 300);
   }, []);
 
   return (
-    <div className="translate-custom">
+    <div className={compact ? 'translate-custom translate-custom--compact' : 'translate-custom'}>
       <label className="translate-custom__label sr-only" htmlFor="translate-select">
-        Dil
+        Language
       </label>
       <div className="translate-custom__field">
+        {compact ? (
+          <span className="translate-custom__icon" aria-hidden>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M3 12h18" />
+              <path d="M12 3a15 15 0 0 1 0 18" />
+              <path d="M12 3a15 15 0 0 0 0 18" />
+            </svg>
+          </span>
+        ) : null}
         <select
           id="translate-select"
           value={selected}
           onChange={handleChange}
-          className="translate-custom__select"
+          className={compact ? 'translate-custom__select translate-custom__select--compact' : 'translate-custom__select'}
+          aria-label="Language"
         >
           {LANGUAGE_OPTIONS.map((option) => (
             <option key={option.code} value={option.code}>

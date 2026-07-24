@@ -1,4 +1,5 @@
 import axios, { AxiosError, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
+import { resolveApiBaseUrlForHostname } from '@/lib/api-base';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3002';
 
@@ -10,6 +11,7 @@ export const apiClient = axios.create({
 // Token interceptor
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   if (typeof window !== 'undefined') {
+    config.baseURL = resolveApiBaseUrlForHostname(window.location.hostname);
     const token = window.localStorage.getItem('auth_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;

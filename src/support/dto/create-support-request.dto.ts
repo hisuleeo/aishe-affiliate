@@ -1,5 +1,10 @@
 import { IsOptional, IsString, MaxLength, IsObject } from 'class-validator';
 
+type SupportHistoryMessage = {
+  role: 'user' | 'assistant';
+  content: string;
+};
+
 export class CreateSupportRequestDto {
   @IsString()
   @MaxLength(2000)
@@ -18,4 +23,7 @@ export class CreateSupportRequestDto {
     email?: string;
     role?: string;
   };
+
+  @IsOptional()
+  history?: SupportHistoryMessage[];
 }

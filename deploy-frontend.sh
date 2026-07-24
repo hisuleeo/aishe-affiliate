@@ -14,6 +14,12 @@ rsync -avz --delete -e "ssh -i ~/Downloads/Ainen3435.pem" \
   /Users/apple/Downloads/referal/frontend/.next/ \
   ec2-user@54.81.59.13:~/aishe-affiliate/frontend/.next/
 
+# Deploy public folder from local workspace
+echo "📤 Deploying public to EC2..."
+rsync -avz --delete -e "ssh -i ~/Downloads/Ainen3435.pem" \
+  /Users/apple/Downloads/referal/frontend/public/ \
+  ec2-user@54.81.59.13:~/aishe-affiliate/frontend/public/
+
 # Copy public folder to standalone
 echo "📁 Copying public folder to standalone..."
 ssh -i ~/Downloads/Ainen3435.pem ec2-user@54.81.59.13 \

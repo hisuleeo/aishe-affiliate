@@ -2,62 +2,17 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { MarketingSiteHeader } from '@/components/layout/MarketingSiteHeader';
 
 export default function AboutPage() {
-  const [isScrolled, setIsScrolled] = useState(false);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 10);
-    };
-    handleScroll();
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
   return (
-    <main className="bg-slate-950 text-white min-h-screen">
+    <main className="bg-slate-950 text-white min-h-screen pt-20">
+      <MarketingSiteHeader sectionHrefPrefix="/" solidBackground />
       <div className="relative">
         <div className="pointer-events-none absolute left-1/2 top-0 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-indigo-500/20 blur-[140px]" />
-        
-        {/* Header */}
-        <header
-          className={`fixed left-0 right-0 top-0 z-50 transition duration-300 ${
-            isScrolled ? 'bg-slate-950/90 backdrop-blur border-b border-slate-800/70' : 'bg-transparent'
-          }`}
-        >
-          <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-6">
-            <Link href="/" className="flex items-center gap-3 text-sm font-semibold">
-              <span className="relative h-12 w-auto">
-                <Image
-                  src="/brand/aishelogo.png"
-                  alt="AISHE"
-                  width={108}
-                  height={48}
-                  className="h-12 w-auto object-contain"
-                  priority
-                />
-              </span>
-            </Link>
-            <nav className="hidden items-center gap-6 text-sm text-slate-300 md:flex">
-              <Link href="/" className="transition hover:text-white">Home</Link>
-              <Link href="/about" className="text-white transition hover:text-indigo-400">About Us</Link>
-              <Link href="/dashboard" className="transition hover:text-white">Dashboard</Link>
-            </nav>
-            <div className="flex items-center gap-3">
-              <Link
-                href="/register"
-                className="rounded-full border border-indigo-500/60 bg-indigo-500/10 px-6 py-2 text-sm font-semibold text-indigo-200 transition hover:border-indigo-400"
-              >
-                Get Started
-              </Link>
-            </div>
-          </div>
-        </header>
 
         {/* Content */}
-        <div className="relative px-6 pt-32 pb-20">
+        <div className="relative px-6 pt-12 pb-20">
           <div className="mx-auto max-w-4xl">
             {/* Hero Section */}
             <div className="text-center mb-16">
@@ -125,40 +80,6 @@ export default function AboutPage() {
           </div>
         </div>
 
-        {/* Footer */}
-        <footer className="relative border-t border-slate-800/70 bg-slate-950/80 backdrop-blur-xl">
-          <div className="mx-auto max-w-6xl px-6 py-12">
-            <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="space-y-3">
-                <Image
-                  src="/brand/aishelogo.png"
-                  alt="AISHE"
-                  width={96}
-                  height={40}
-                  className="h-10 w-auto object-contain"
-                />
-                <p className="text-sm text-slate-400">Autonomous AI Assistant</p>
-              </div>
-              <div className="space-y-3 text-sm text-slate-300">
-                <p className="text-base font-semibold text-white">Company</p>
-                <Link href="/about" className="block transition hover:text-white">About Us</Link>
-                <Link href="/kvkk" className="block transition hover:text-white">Privacy Policy</Link>
-              </div>
-              <div className="space-y-3 text-sm text-slate-300">
-                <p className="text-base font-semibold text-white">Product</p>
-                <Link href="/dashboard" className="block transition hover:text-white">Dashboard</Link>
-                <Link href="/order" className="block transition hover:text-white">Packages</Link>
-              </div>
-              <div className="space-y-3 text-sm text-slate-300">
-                <p className="text-base font-semibold text-white">Contact</p>
-                <a href="mailto:demo@aishe.local" className="block transition hover:text-white">demo@aishe.local</a>
-              </div>
-            </div>
-            <div className="mt-8 border-t border-slate-800/70 pt-8 text-center text-xs text-slate-500">
-              <p>© 2026 AISHE. All rights reserved.</p>
-            </div>
-          </div>
-        </footer>
       </div>
     </main>
   );

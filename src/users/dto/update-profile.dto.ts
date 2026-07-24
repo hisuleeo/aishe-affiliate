@@ -1,4 +1,4 @@
-import { IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 
 export class UpdateProfileDto {
   @IsOptional()
@@ -14,4 +14,12 @@ export class UpdateProfileDto {
     message: 'Kullanıcı adı sadece harf, rakam ve alt çizgi içerebilir.',
   })
   username?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  wantsAffiliateProgram?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  wantsReferralProgram?: boolean;
 }

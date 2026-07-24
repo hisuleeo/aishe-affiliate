@@ -24,7 +24,12 @@ export class SupportController {
   @Public()
   @Post('chat')
   createSupportRequest(@Body() payload: CreateSupportRequestDto) {
-    return this.supportService.getChatResponse(payload.question, payload.lang);
+    return this.supportService.getChatResponse(
+      payload.question,
+      payload.lang,
+      payload.userContext,
+      payload.history,
+    );
   }
 
   // Create ticket - Authenticated users

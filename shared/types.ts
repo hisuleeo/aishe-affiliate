@@ -111,13 +111,17 @@ export type Order = {
   packageId: string;
   status: OrderStatus;
   amount: string; // decimal string
+  discountAmount?: string | null;
   currency: string;
   attributionType: OrderAttributionType;
   affiliateId?: string | null;
   referralCode?: string | null;
   referralUserId?: string | null;
   aisheId?: string | null;
+  aisheLabel?: string | null;
+  aisheMoneyUsed?: string | null;
   selectedOptions?: string[] | null;
+  trialEndsAt?: string | null;
   validUntil?: string | null;
   createdAt: string;
   package?: Package;

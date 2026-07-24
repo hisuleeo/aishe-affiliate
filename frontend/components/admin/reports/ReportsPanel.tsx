@@ -29,11 +29,11 @@ export function ReportsPanel() {
     },
   });
 
-  const formatCurrency = (amount: string | number, currency: string = 'USD') => {
+  const formatCurrency = (amount: string | number, _currency: string = 'USD') => {
     const num = typeof amount === 'string' ? parseFloat(amount) : amount;
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: currency,
+      currency: 'USD',
       maximumFractionDigits: 2,
     }).format(num);
   };
@@ -121,7 +121,7 @@ export function ReportsPanel() {
             Toplam Gelir
           </div>
           <div className="mt-2 text-3xl font-bold">
-            {data ? formatCurrency(data.summary.totalRevenue, data.summary.currency) : '$0'}
+            {data ? formatCurrency(data.summary.totalRevenue, 'USD') : '$0'}
           </div>
         </div>
       </div>

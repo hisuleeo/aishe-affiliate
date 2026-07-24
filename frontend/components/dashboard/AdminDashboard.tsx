@@ -22,10 +22,10 @@ import {
   getAdminOrders,
 } from '@/services/adminService';
 
-const formatCurrency = (amount: number, currency: string = 'USD') =>
+const formatCurrency = (amount: number, _currency: string = 'USD') =>
   new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: currency || 'USD',
+    currency: 'USD',
     maximumFractionDigits: 2,
   }).format(Number.isNaN(amount) ? 0 : amount);
 
@@ -101,7 +101,7 @@ export default function AdminDashboard() {
     const totalRevenue = items.filter((o) => o.status === 'paid').reduce((sum, order) => sum + Number(order.amount), 0);
     const affiliateRevenue = affiliateOrders.filter((o) => o.status === 'paid').reduce((sum, order) => sum + Number(order.amount), 0);
     const referralRevenue = referralOrders.filter((o) => o.status === 'paid').reduce((sum, order) => sum + Number(order.amount), 0);
-    const currency = items[0]?.currency ?? 'EUR';
+    const currency = 'USD';
 
     return {
       totalOrders: items.length,

@@ -21,15 +21,22 @@ export type SupportResponse = {
   answer: string;
 };
 
+export type SupportHistoryMessage = {
+  role: 'user' | 'assistant';
+  content: string;
+};
+
 export const sendSupportQuestion = async (
-  question: string, 
+  question: string,
   lang?: string,
-  userContext?: { id?: string; name?: string; email?: string; role?: string }
+  userContext?: { id?: string; name?: string; email?: string; role?: string },
+  history?: SupportHistoryMessage[],
 ) => {
   const response = await apiClient.post<SupportResponse>('/support/chat', {
     question,
     lang: lang ?? getPreferredLanguage(),
     userContext, // User bilgisini backend'e gönderiyoruz
+    history,
   });
   return response.data;
 };

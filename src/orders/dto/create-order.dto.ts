@@ -2,17 +2,33 @@ import { IsArray, IsBoolean, IsNumber, IsObject, IsOptional, IsString, IsUUID, V
 import { Type } from 'class-transformer';
 
 class InvoiceInfoDto {
+  @IsOptional()
   @IsString()
-  companyName!: string;
+  type?: 'corporate' | 'individual';
 
+  @IsOptional()
   @IsString()
-  taxNumber!: string;
+  companyName?: string;
 
+  @IsOptional()
   @IsString()
-  taxOffice!: string;
+  taxNumber?: string;
 
+  @IsOptional()
   @IsString()
-  address!: string;
+  taxOffice?: string;
+
+  @IsOptional()
+  @IsString()
+  fullName?: string;
+
+  @IsOptional()
+  @IsString()
+  nationalId?: string;
+
+  @IsOptional()
+  @IsString()
+  address?: string;
 }
 
 // Sipariş oluşturma isteği
@@ -48,6 +64,10 @@ export class CreateOrderDto {
   @IsOptional()
   @IsBoolean()
   needsInvoice?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  useAisheeMoney?: boolean;
 
   @IsOptional()
   @ValidateNested()

@@ -17,6 +17,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { StatCard } from '@/components/ui/StatCard';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { useAuth } from '@/components/auth/useAuth';
+import { getTraderInsight, type TraderInsightResponse } from '@/services/traderInsightService';
 import {
   User,
   Package as PackageIcon,
@@ -29,14 +30,15 @@ import {
   Gift,
   Zap,
   ArrowRight,
+  Activity,
 } from 'lucide-react';
 import { UserTickets } from '@/components/user/support/UserTickets';
 
-const formatCurrency = (amount: string | number, currency: string) => {
+const formatCurrency = (amount: string | number, _currency: string) => {
   const value = Number(amount);
-  return new Intl.NumberFormat('tr-TR', {
+  return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency,
+    currency: 'USD',
     maximumFractionDigits: 2,
   }).format(Number.isNaN(value) ? 0 : value);
 };
@@ -142,13 +144,21 @@ export default function UserDashboard() {
   const latestOrder = latestOrders[0] ?? null;
   const activeOrder = useMemo(() => (orders ?? []).find((o) => o.status === 'paid') ?? null, [orders]);
   const pendingOrder = useMemo(() => (orders ?? []).find((o) => o.status === 'pending') ?? null, [orders]);
+  const insightAisheId = activeOrder?.aisheId ?? latestOrder?.aisheId ?? undefined;
+
+  const { data: traderInsight, isLoading: traderInsightLoading } = useQuery<TraderInsightResponse>({
+    queryKey: ['trader-insight', insightAisheId],
+    queryFn: () => getTraderInsight(insightAisheId),
+    enabled: isAuthenticated && !!insightAisheId,
+    staleTime: 2 * 60 * 1000,
+  });
 
   const totalSpend = useMemo(
     () => (orders ?? []).reduce((sum, o) => sum + Number(o.amount), 0),
     [orders],
   );
 
-  const primaryCurrency = orders?.[0]?.currency ?? 'EUR';
+  const primaryCurrency = 'USD';
 
   const packageMap = useMemo(
     () => new Map((packages ?? []).map((pkg) => [pkg.id, pkg])),
@@ -282,6 +292,76 @@ export default function UserDashboard() {
               : 'İlk linkinizi oluşturun.'
           }
         />
+      </div>
+
+      {/* AI Trader Rehberi */}
+      <div className="rounded-2xl border border-cyan-500/20 bg-gradient-to-br from-cyan-500/8 via-slate-950/40 to-slate-950/60 p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-base font-semibold text-cyan-100">AI Trader Rehberi</h2>
+          <div className="flex items-center gap-2 text-[11px] text-slate-400">
+            <span className="rounded-full border border-slate-700 bg-slate-900/70 px-2 py-1">
+              {traderInsight?.source === 'anthropic' ? 'AI Mode' : 'Rule Mode'}
+            </span>
+            {traderInsight?.aisheId ? (
+              <span className="rounded-full border border-slate-700 bg-slate-900/70 px-2 py-1 font-mono text-cyan-200">
+                {traderInsight.aisheId}
+              </span>
+            ) : null}
+          </div>
+        </div>
+
+        {traderInsightLoading ? (
+          <div className="mt-4 space-y-2">
+            <div className="h-4 w-2/3 animate-pulse rounded bg-slate-800" />
+            <div className="h-4 w-full animate-pulse rounded bg-slate-800/70" />
+            <div className="h-4 w-5/6 animate-pulse rounded bg-slate-800/70" />
+          </div>
+        ) : !insightAisheId ? (
+          <p className="mt-4 text-sm text-slate-400">
+            Rehber üretimi için AISHE ID içeren aktif bir sipariş gerekli.
+          </p>
+        ) : traderInsight?.error ? (
+          <p className="mt-4 text-sm text-amber-300">{traderInsight.error}</p>
+        ) : (
+          <div className="mt-4 space-y-4">
+            <p className="text-sm text-slate-200">{traderInsight?.summary}</p>
+
+            <div className="grid gap-4 lg:grid-cols-3">
+              <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Saatlik Odak</p>
+                <div className="mt-2 space-y-2 text-xs text-slate-300">
+                  {(traderInsight?.hourlyFocus ?? []).map((item, i) => (
+                    <p key={`${item}-${i}`}>• {item}</p>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-3 lg:col-span-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Pozisyon Senaryoları</p>
+                <div className="mt-2 space-y-2 text-xs text-slate-300">
+                  {(traderInsight?.positionIdeas ?? []).map((idea, i) => (
+                    <div key={`${idea.instrument}-${i}`} className="rounded-lg border border-slate-800/80 bg-slate-950/50 p-2.5">
+                      <p className="font-semibold text-cyan-200">{idea.instrument} · {idea.bias}</p>
+                      <p className="mt-1">Setup: {idea.setup}</p>
+                      <p className="mt-1 text-slate-400">Invalidation: {idea.invalidation}</p>
+                      <p className="mt-1 text-amber-200">Risk: {idea.risk}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-amber-200">Risk Checklist</p>
+              <div className="mt-2 space-y-1.5 text-xs text-amber-100/90">
+                {(traderInsight?.riskChecks ?? []).map((item, i) => (
+                  <p key={`${item}-${i}`}>• {item}</p>
+                ))}
+              </div>
+              <p className="mt-3 text-[11px] text-amber-200/80">{traderInsight?.disclaimer}</p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Son Siparişler + Aktif Paket */}
@@ -428,7 +508,7 @@ export default function UserDashboard() {
           <Zap className="h-4 w-4 text-yellow-400" />
           Hızlı Erişim
         </h2>
-        <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-5">
           <Link
             href="/profile?tab=orders"
             className="flex items-center gap-3 rounded-xl border border-slate-800/80 bg-slate-950/40 p-4 text-sm font-semibold text-slate-200 transition hover:border-indigo-500/40 hover:bg-indigo-500/5"
@@ -460,6 +540,14 @@ export default function UserDashboard() {
             <Gift className="h-5 w-5 text-indigo-400 shrink-0" />
             <span>Referral Ödüller</span>
             <ArrowRight className="ml-auto h-4 w-4 text-slate-500" />
+          </Link>
+          <Link
+            href="/trader-insight"
+            className="flex items-center gap-3 rounded-xl border border-cyan-500/30 bg-cyan-500/5 p-4 text-sm font-semibold text-cyan-100 transition hover:border-cyan-400/50 hover:bg-cyan-500/10"
+          >
+            <Activity className="h-5 w-5 text-cyan-300 shrink-0" />
+            <span>Trader Insight</span>
+            <ArrowRight className="ml-auto h-4 w-4 text-cyan-300/70" />
           </Link>
         </div>
       </div>

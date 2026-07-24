@@ -11,11 +11,11 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { CheckCircle, XCircle, Clock } from 'lucide-react';
 
-const formatCurrency = (amount: string, currency: string) => {
+const formatCurrency = (amount: string, _currency: string) => {
   const value = Number(amount);
-  return new Intl.NumberFormat('tr-TR', {
+  return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency,
+    currency: 'USD',
     maximumFractionDigits: 2,
   }).format(Number.isNaN(value) ? 0 : value);
 };
